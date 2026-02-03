@@ -10,6 +10,9 @@ venv/
 .python-version
 pyproject.toml
 
+#gitignore file
+.gitignore
+
 # Environment
 .env
 .env.local
