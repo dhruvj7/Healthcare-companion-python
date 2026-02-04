@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     ]
     
     # AI/LLM Configuration
-    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "AIzaSyBJ6tCmVR_kIK0Cqhy9Iy9sBaBAtbtlG8s")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2048"))

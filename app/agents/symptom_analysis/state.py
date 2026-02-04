@@ -46,6 +46,12 @@ class SymptomAnalysisState(TypedDict):
     requires_doctor: bool
     is_emergency: bool
     urgency_level: Optional[str]
+
+        # Care Coordination (NEW)
+    suggested_specialties: Optional[List[str]]
+    matched_doctors: Optional[List[dict]]
+    matched_hospitals: Optional[List[dict]]
+
     
     # Metadata
     timestamp: Optional[str]
