@@ -175,9 +175,9 @@ def create_hospital_guidance_agent():
     logger.info("Hospital guidance agent workflow compiled successfully")
 
     graph = workflow.compile()
-    mermaid = graph.draw_mermaid()
-    print(mermaid)
-    return 
+    # mermaid = graph.draw_mermaid()
+    # print(mermaid)
+    return graph
 
 # Create the agent
 hospital_guidance_agent = create_hospital_guidance_agent()

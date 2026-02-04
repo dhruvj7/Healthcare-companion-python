@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.api.v1.routes import symptom_analysis
+from app.api.v1.routes import hospital_guidance
 from app.api.middleware.error_handler import error_handler_middleware
 from app.api.middleware.logging_middleware import logging_middleware
 from app.core.config import settings
@@ -11,7 +12,6 @@ from app.core.logging import setup_logging
 
 import logging
 
-# Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,12 @@ app.include_router(
     symptom_analysis.router,
     prefix="/api/v1",
     tags=["Symptom Analysis"]
+)
+
+app.include_router(
+    hospital_guidance.router,
+    prefix="/api/v1",
+    tags=["Hospital Guidance"]
 )
 
 @app.get("/")

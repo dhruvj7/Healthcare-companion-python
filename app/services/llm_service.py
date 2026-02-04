@@ -1,4 +1,3 @@
-# app/services/llm_service.py
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.core.config import settings
 
