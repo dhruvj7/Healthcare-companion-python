@@ -1,20 +1,17 @@
 # app/core/logging.py
 import logging
 import sys
-from pathlib import Path
 from app.core.config import settings
 
 def setup_logging():
     """Configure application logging"""
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
-
+    
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler(log_dir / "app.log", mode="a"),
+            logging.FileHandler('logs/app.log', mode='a')
         ]
     )
     
