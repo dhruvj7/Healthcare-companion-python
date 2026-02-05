@@ -24,12 +24,6 @@ async def lifespan(app: FastAPI):
     # Startup logic here
     await init_db()
     await seed_sample_data()
-
-    print("✅ Database initialized and sample data seeded successfully")
-
-    await init_db()
-    await seed_sample_data()
-
     print("✅ Database initialized and sample data seeded successfully")
 
     yield
