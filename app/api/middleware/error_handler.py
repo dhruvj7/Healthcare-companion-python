@@ -33,6 +33,6 @@ async def error_handler_middleware(request: Request, call_next):
             content={
                 "error": "Internal Server Error",
                 "message": "An unexpected error occurred",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.datetime.now().isoformat()
             }
         )

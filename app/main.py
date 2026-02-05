@@ -3,12 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
-from app.api.v1.routes import symptom_analysis
+from app.api.v1.routes import appointment_scheduler, symptom_analysis
 from app.api.v1.routes import hospital_guidance
 from app.api.middleware.error_handler import error_handler_middleware
 from app.api.middleware.logging_middleware import logging_middleware
 from app.core.config import settings
 from app.core.logging import setup_logging
+
+from app.data.schemas.appointment import init_db, seed_sample_data
 
 import logging
 
@@ -20,6 +22,11 @@ async def lifespan(app: FastAPI):
     """Lifecycle manager for startup and shutdown"""
     logger.info("Starting Healthcare AI Service...")
     # Startup logic here
+    await init_db()
+    await seed_sample_data()
+
+    print("✅ Database initialized and sample data seeded successfully")
+
     yield
     # Shutdown logic here
     logger.info("Shutting down Healthcare AI Service...")
@@ -29,6 +36,7 @@ app = FastAPI(
     title="Healthcare AI Service",
     description="AI-powered healthcare companion system",
     version=settings.VERSION,
+    lifespan=lifespan
 )
 
 # CORS Configuration
@@ -49,6 +57,12 @@ app.include_router(
     symptom_analysis.router,
     prefix="/api/v1",
     tags=["Symptom Analysis"]
+)
+
+app.include_router(
+    appointment_scheduler.router,
+    prefix="/api/v1",
+    tags=["Appointment Scheduler"]
 )
 
 app.include_router(
