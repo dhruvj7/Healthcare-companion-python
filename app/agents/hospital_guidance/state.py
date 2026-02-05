@@ -31,6 +31,12 @@ class PriorityLevel(Enum):
     HIGH = "high"             # Important, time-sensitive
     MEDIUM = "medium"         # Should be done soon
     LOW = "low"               # Nice to have
+class AppointmentStatus(Enum):
+    SCHEDULED = "scheduled"
+    CONFIRMED = "confirmed"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    RESCHEDULED = "rescheduled"
 
 class HospitalGuidanceState(TypedDict):
     # ===== SESSION INFO =====
@@ -46,6 +52,7 @@ class HospitalGuidanceState(TypedDict):
     appointment_time: datetime
     department: str
     reason_for_visit: str
+    appointment_status: Optional[str]
     
     # ===== LOCATION & NAVIGATION =====
     current_location: Optional[Dict[str, Any]]  # {building, floor, room, coordinates}
@@ -72,11 +79,30 @@ class HospitalGuidanceState(TypedDict):
     prescriptions: Optional[List[Dict[str, Any]]]
     tests_ordered: Optional[List[Dict[str, Any]]]
     follow_up_needed: bool
-    follow_up_date: Optional[datetime]
     
+    # ===== FOLLOW-UP APPOINTMENT =====
+    follow_up_appointment: Optional[Dict[str, Any]]
+    # Structure:
+    # {
+    #     "appointment_id": str,
+    #     "doctor_name": str,
+    #     "appointment_time": datetime,
+    #     "department": str,
+    #     "reason": str,
+    #     "type": str,  # "follow_up", "new", "urgent"
+    #     "status": str,  # "scheduled", "confirmed"
+    #     "confirmation_sent": bool,
+    #     "reminder_sent": bool,
+    #     "notes": str
+    # }
+        
     # ===== POST-VISIT TASKS =====
     pending_tasks: List[Dict[str, Any]]  # Lab work, pharmacy, billing, etc.
     completed_tasks: List[str]
+
+    # NEW: Nearby amenities (separate from notifications)
+    nearby_amenities: Optional[List[Dict[str, Any]]]
+    amenities_last_updated: Optional[datetime]
     
     # ===== NOTIFICATIONS & ALERTS =====
     notifications: List[Dict[str, Any]]

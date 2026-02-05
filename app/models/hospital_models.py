@@ -326,6 +326,10 @@ class JourneyResponse(BaseModel):
     destination: Optional[LocationInfo] = None
     navigation_active: bool = False
     navigation_route: Optional[List[NavigationStep]] = None
+
+    # NEW: Nearby amenities (separate from notifications)
+    nearby_amenities: Optional[List[Amenity]] = None
+    amenities_last_updated: Optional[datetime] = None
     
     # Check-in status
     check_in_completed: bool = False
@@ -347,6 +351,12 @@ class JourneyResponse(BaseModel):
     # Tasks
     pending_tasks: List[Task] = []
     completed_tasks: List[str] = []
+
+    # Current visit appointment
+    current_appointment: Optional[AppointmentInfo] = None
+    
+    # Follow-up appointment (separate from notifications!)
+    follow_up_appointment: Optional[AppointmentInfo] = None
     
     # Communications
     notifications: List[Notification] = []
@@ -462,3 +472,93 @@ class SessionInfo(BaseModel):
     last_activity: datetime
     journey_stage: JourneyStageEnum
     active: bool
+
+class Amenity(BaseModel):
+    """Nearby amenity information"""
+    id: str
+    name: str
+    type: str  # restroom, food, pharmacy, etc.
+    distance: float  # in feet
+    walking_time: int  # in seconds
+    direction: str  # north, south, east, west
+    
+    # Optional fields
+    wheelchair_accessible: bool = True
+    hours: Optional[str] = None
+    currently_open: Optional[bool] = None
+    available: bool = True
+    
+    # Location details
+    building: Optional[str] = None
+    floor: Optional[str] = None
+    room: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "amenity_restroom_2a",
+                "name": "Restroom 2A",
+                "type": "restroom",
+                "distance": 10,
+                "walking_time": 3,
+                "direction": "east",
+                "wheelchair_accessible": True,
+                "hours": "24/7",
+                "currently_open": True,
+                "available": True,
+                "building": "A",
+                "floor": "2",
+                "room": "restroom_2a"
+            }
+        }
+
+class AppointmentInfo(BaseModel):
+    """Detailed appointment information"""
+    appointment_id: str
+    doctor_name: str
+    appointment_time: datetime
+    department: str
+    reason: str
+    
+    # Appointment metadata
+    type: str = "follow_up"  # follow_up, new, urgent, routine
+    status: str = "scheduled"  # scheduled, confirmed, completed, cancelled
+    
+    # Location details
+    building: Optional[str] = None
+    floor: Optional[str] = None
+    room: Optional[str] = None
+    
+    # Preparation
+    preparation_required: Optional[List[str]] = None  # "Fasting", "Bring medications"
+    estimated_duration: Optional[int] = None  # minutes
+    
+    # Confirmations
+    confirmation_sent: bool = False
+    reminder_sent: bool = False
+    
+    # Additional info
+    notes: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "appointment_id": "APT1001",
+                "doctor_name": "Dr. Sarah Smith",
+                "appointment_time": "2026-02-19T10:00:00",
+                "department": "Cardiology",
+                "reason": "Follow-up for chest pain management",
+                "type": "follow_up",
+                "status": "scheduled",
+                "building": "A",
+                "floor": "3",
+                "room": "305",
+                "preparation_required": ["Bring medication list", "Fasting not required"],
+                "estimated_duration": 30,
+                "confirmation_sent": True,
+                "reminder_sent": False,
+                "notes": "Bring previous test results",
+                "created_at": "2026-02-05T10:30:00"
+            }
+        }

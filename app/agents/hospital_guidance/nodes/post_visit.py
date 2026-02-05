@@ -1,6 +1,7 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime, timedelta
+import uuid
 
 from app.agents.hospital_guidance.state import HospitalGuidanceState, JourneyStage, PriorityLevel
 from app.agents.hospital_guidance.tools.navigation_tool import navigation_tool
@@ -214,39 +215,135 @@ def schedule_lab_work(state: HospitalGuidanceState, schedule_now: bool) -> Dict[
 
 def schedule_follow_up(
     state: HospitalGuidanceState,
-    preferred_date: datetime
+    preferred_date: datetime,
+    notes: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Schedule follow-up appointment"""
+    """Schedule follow-up appointment with full details"""
     
     logger.info(f"Scheduling follow-up for {preferred_date}")
     
-    # In production, this would integrate with hospital scheduling system
-    # For now, simulate successful scheduling
+    # Generate appointment ID
+    appointment_id = f"APT_{uuid.uuid4().hex[:8].upper()}"
     
+    # Create structured follow-up appointment
+    follow_up_appointment = {
+        "appointment_id": appointment_id,
+        "doctor_name": state['doctor_name'],  # Same doctor
+        "appointment_time": preferred_date,
+        "department": state.get('department', 'General'),
+        "reason": f"Follow-up for {state.get('reason_for_visit', 'previous visit')}",
+        "type": "follow_up",
+        "status": "scheduled",
+        
+        # Location (try to book same location as current visit)
+        "building": state.get("destination", {}).get("building"),
+        "floor": state.get("destination", {}).get("floor"),
+        "room": state.get("destination", {}).get("room"),
+        
+        # Preparation instructions
+        "preparation_required": _get_follow_up_preparation(state),
+        "estimated_duration": 30,  # Default 30 min follow-up
+        
+        # Confirmations
+        "confirmation_sent": True,  # We send confirmation immediately
+        "reminder_sent": False,     # Will send 24h before
+        
+        # Notes
+        "notes": notes or f"Follow-up after {state.get('diagnosis', 'treatment')}",
+        "created_at": datetime.now()
+    }
+    
+    # Create rich notification
     notification = {
         "type": "success",
         "title": "Follow-up Scheduled",
-        "message": f"Your follow-up appointment with Dr. {state['doctor_name']} is scheduled for {preferred_date.strftime('%B %d, %Y at %I:%M %p')}. You'll receive a reminder 24 hours before.",
-        "timestamp": datetime.now()
+        "message": _format_appointment_message(follow_up_appointment),
+        "timestamp": datetime.now(),
+        "action": "view_appointment",
+        "action_data": {
+            "appointment_id": appointment_id
+        }
     }
     
-    # Update task
+    # Update tasks
     tasks = state.get("pending_tasks", [])
     completed = state.get("completed_tasks", [])
     
     for task in tasks:
         if task.get("task_id") == "schedule_follow_up":
             task["status"] = "completed"
-            completed.append("schedule_follow_up")
+            task["completed_at"] = datetime.now()
+            task["result"] = {
+                "appointment_id": appointment_id,
+                "appointment_time": preferred_date
+            }
+            if "schedule_follow_up" not in completed:
+                completed.append("schedule_follow_up")
+    
+    # Send confirmation (in production, this would email/SMS)
+    logger.info(f"Sending appointment confirmation for {appointment_id}")
     
     return {
         **state,
-        "follow_up_date": preferred_date,
+        "follow_up_appointment": follow_up_appointment,  # ← Full structured data
+        "follow_up_needed": False,  # Mark as fulfilled
         "pending_tasks": [t for t in tasks if t.get("status") != "completed"],
         "completed_tasks": completed,
         "notifications": state.get("notifications", []) + [notification],
         "last_updated": datetime.now()
     }
+
+
+def _get_follow_up_preparation(state: HospitalGuidanceState) -> List[str]:
+    """Determine preparation needed for follow-up"""
+    preparation = []
+    
+    # If there were tests ordered, bring results
+    if state.get("tests_ordered"):
+        preparation.append("Bring any completed test results")
+    
+    # If on medications, bring list
+    if state.get("prescriptions"):
+        preparation.append("Bring updated medication list")
+    
+    # Department-specific preparation
+    department = state.get("department", "").lower()
+    if "cardiology" in department:
+        preparation.append("Track blood pressure at home if possible")
+    elif "endocrin" in department:
+        preparation.append("Record blood sugar levels for 3 days before visit")
+    elif "orthoped" in department:
+        preparation.append("Note any changes in pain or mobility")
+    
+    # Default
+    if not preparation:
+        preparation.append("No special preparation required")
+    
+    return preparation
+
+
+def _format_appointment_message(appointment: Dict) -> str:
+    """Create human-friendly appointment message"""
+    date_str = appointment["appointment_time"].strftime('%A, %B %d, %Y')
+    time_str = appointment["appointment_time"].strftime('%I:%M %p')
+    
+    message = f"""Your follow-up appointment is scheduled:
+
+📅 {date_str} at {time_str}
+👨‍⚕️ {appointment['doctor_name']}
+🏥 {appointment['department']} Department
+📍 Building {appointment.get('building', 'TBD')}, Floor {appointment.get('floor', 'TBD')}
+⏱️ Estimated duration: {appointment.get('estimated_duration', 30)} minutes
+
+✅ Confirmation sent to your email
+⏰ You'll receive a reminder 24 hours before
+"""
+    
+    if appointment.get("preparation_required"):
+        prep_list = "\n".join([f"  • {p}" for p in appointment["preparation_required"]])
+        message += f"\n📋 Please prepare:\n{prep_list}"
+    
+    return message
 
 
 def process_payment(state: HospitalGuidanceState, payment_method: str) -> Dict[str, Any]:

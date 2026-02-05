@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any
 import logging
@@ -5,6 +6,7 @@ from datetime import datetime
 import uuid
 
 from app.models.hospital_models import (
+    AppointmentInfo,
     InitializeJourneyRequest,
     UserInteractionRequest,
     NavigationRequest,
@@ -87,8 +89,8 @@ async def initialize_journey(request: InitializeJourneyRequest):
             "visit_ended": False,
             "visit_summary": None,
             "diagnosis": None,
-            "prescriptions": None,
-            "tests_ordered": None,
+            "prescriptions": [],
+            "tests_ordered": [],
             "follow_up_needed": False,
             "follow_up_date": None,
             
@@ -786,7 +788,8 @@ def _state_to_response(state: HospitalGuidanceState) -> JourneyResponse:
         Prescription,
         TestOrder,
         Task,
-        LocationInfo
+        LocationInfo,
+        Amenity
     )
     
     # Build queue status
@@ -796,7 +799,7 @@ def _state_to_response(state: HospitalGuidanceState) -> JourneyResponse:
             queue_position=state["queue_position"],
             estimated_wait_time=state.get("estimated_wait_time"),
             patients_ahead=state["queue_position"] - 1 if state["queue_position"] else None,
-            last_updated=state.get("last_wait_update", datetime.now())
+            last_updated=state.get("last_wait_update") or datetime.now()
         )
     
     # Convert location
@@ -809,15 +812,42 @@ def _state_to_response(state: HospitalGuidanceState) -> JourneyResponse:
     if state.get("destination"):
         dest = state["destination"]
         destination = LocationInfo(**dest)
+
+    amenities = None
+    if state.get("nearby_amenities"):
+        amenities = [Amenity(**a) for a in state["nearby_amenities"]]
+    
+    current_appointment = None
+    if state.get("appointment_id"):
+        current_appointment = AppointmentInfo(
+            appointment_id=state["appointment_id"],
+            doctor_name=state["doctor_name"],
+            appointment_time=state["appointment_time"],
+            department=state.get("department", "General"),
+            reason=state.get("reason_for_visit", ""),
+            type="current",
+            status="in_progress" if state.get("visit_started") else "scheduled",
+            created_at=state.get("started_at", datetime.now())
+        )
+    
+    # Convert follow-up appointment
+    follow_up_appointment = None
+    if state.get("follow_up_appointment"):
+        follow_up = state["follow_up_appointment"]
+        follow_up_appointment = AppointmentInfo(**follow_up)
     
     return JourneyResponse(
         session_id=state["session_id"],
         journey_stage=JourneyStageEnum(state["journey_stage"].value),
         patient_id=state["patient_id"],
+        current_appointment=current_appointment,
+        follow_up_appointment=follow_up_appointment,
         current_location=current_location,
         destination=destination,
         navigation_active=state.get("navigation_active", False),
         navigation_route=state.get("navigation_route"),
+        nearby_amenities=amenities,
+        amenities_last_updated=state.get("amenities_last_updated"),
         check_in_completed=state.get("check_in_completed", False),
         insurance_verified=state.get("insurance_verified", False),
         forms_completed=state.get("forms_completed", False),
