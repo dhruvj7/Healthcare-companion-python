@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     
     # Database (Future)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+    # 🔹 Add SMTP config
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USERNAME: str
+    SMTP_PASSWORD: str
+    SMTP_FROM_EMAIL: str
     
     class Config:
         env_file = ".env"

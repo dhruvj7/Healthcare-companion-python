@@ -8,6 +8,10 @@ env/
 venv/
 *.egg-info/
 
+#database
+database/
+*.db
+
 # Environment
 .env
 .env.local
