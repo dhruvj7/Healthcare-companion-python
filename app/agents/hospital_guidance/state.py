@@ -65,6 +65,10 @@ class HospitalGuidanceState(TypedDict):
     insurance_verified: bool
     forms_completed: bool
     copay_paid: bool
+
+    # ===== INSURANCE DETAILS =====
+    insurance_details: Optional[Dict[str, Any]]  # Validated insurance information
+    insurance_validation_errors: Optional[List[Dict[str, str]]]  # Validation errors if any
     
     # ===== QUEUE MANAGEMENT =====
     queue_position: Optional[int]

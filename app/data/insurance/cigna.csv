@@ -1,0 +1,11 @@
+policy_number,group_number,policy_holder_name,policy_holder_dob,relationship,effective_date,expiration_date,status,coverage_type,copay_amount
+CIG123456789,CGRP001,Mark Turner,1981-05-22,self,2025-01-01,2026-12-31,active,PPO,45
+CIG987654321,CIG002,Laura Phillips,1989-10-08,self,2024-07-01,2025-12-31,active,HMO,30
+CIG111222333,CGRP001,Kevin Campbell,1976-02-14,self,2025-02-01,2026-12-31,active,PPO,45
+CIG444555666,CGRP003,Michelle Parker,1983-08-27,self,2024-09-01,2025-12-31,active,EPO,35
+CIG777888999,CGRP001,Brian Evans,1978-12-19,self,2025-01-01,2026-12-31,active,PPO,45
+CIG101112131,CGRP002,Jennifer Edwards,1985-04-11,self,2024-11-01,2025-12-31,active,HMO,30
+CIG141516171,CGRP004,Jason Collins,1991-09-03,self,2025-03-01,2026-12-31,active,PPO,45
+CIG181920212,CGRP001,Rebecca Stewart,1979-06-25,self,2024-08-01,2025-12-31,active,PPO,45
+CIG232425262,CGRP003,Ryan Morris,1984-11-16,self,2025-01-15,2026-12-31,active,EPO,35
+CIG272829303,CGRP002,Nicole Rogers,1992-07-09,self,2024-10-01,2025-12-31,active,HMO,30

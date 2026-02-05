@@ -1,7 +1,10 @@
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+
+if TYPE_CHECKING:
+    from typing import ForwardRef
 
 # ===== ENUMS =====
 
@@ -127,7 +130,7 @@ class CheckInRequest(BaseModel):
     session_id: str = Field(..., description="Active session ID")
     insurance_card_image: Optional[str] = Field(default=None, description="Base64 encoded insurance card")
     medical_history_updates: Optional[Dict[str, Any]] = Field(default=None, description="Medical history changes")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -136,6 +139,52 @@ class CheckInRequest(BaseModel):
                     "new_medications": ["Aspirin 81mg"],
                     "new_allergies": []
                 }
+            }
+        }
+
+class InsuranceValidationRequest(BaseModel):
+    """Validate insurance details"""
+    provider_name: str = Field(..., description="Insurance provider name", min_length=2)
+    policy_number: str = Field(..., description="Policy/member ID number", min_length=5)
+    group_number: Optional[str] = Field(default=None, description="Group number if applicable")
+    policy_holder_name: str = Field(..., description="Name of policy holder", min_length=2)
+    policy_holder_dob: str = Field(..., description="Policy holder date of birth (YYYY-MM-DD)")
+    relationship_to_patient: str = Field(..., description="Relationship to patient (self, spouse, parent, child)")
+    effective_date: str = Field(..., description="Policy effective date (YYYY-MM-DD)")
+    expiration_date: Optional[str] = Field(default=None, description="Policy expiration date (YYYY-MM-DD)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "provider_name": "Blue Cross Blue Shield",
+                "policy_number": "ABC123456789",
+                "group_number": "GRP001",
+                "policy_holder_name": "John Doe",
+                "policy_holder_dob": "1985-05-15",
+                "relationship_to_patient": "self",
+                "effective_date": "2025-01-01",
+                "expiration_date": "2026-12-31"
+            }
+        }
+
+class InsuranceValidationResponse(BaseModel):
+    """Response for insurance validation"""
+    session_id: str
+    is_valid: bool
+    validation_errors: List[Dict[str, str]] = []
+    insurance_verified: bool = False
+    message: str
+    timestamp: datetime
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "sess_abc123",
+                "is_valid": True,
+                "validation_errors": [],
+                "insurance_verified": True,
+                "message": "Insurance details validated successfully",
+                "timestamp": "2026-02-05T14:30:00"
             }
         }
 
@@ -328,7 +377,7 @@ class JourneyResponse(BaseModel):
     navigation_route: Optional[List[NavigationStep]] = None
 
     # NEW: Nearby amenities (separate from notifications)
-    nearby_amenities: Optional[List[Amenity]] = None
+    nearby_amenities: Optional[List['Amenity']] = None
     amenities_last_updated: Optional[datetime] = None
     
     # Check-in status
@@ -353,10 +402,10 @@ class JourneyResponse(BaseModel):
     completed_tasks: List[str] = []
 
     # Current visit appointment
-    current_appointment: Optional[AppointmentInfo] = None
-    
+    current_appointment: Optional['AppointmentInfo'] = None
+
     # Follow-up appointment (separate from notifications!)
-    follow_up_appointment: Optional[AppointmentInfo] = None
+    follow_up_appointment: Optional['AppointmentInfo'] = None
     
     # Communications
     notifications: List[Notification] = []
