@@ -6,21 +6,19 @@ import uuid
 from app.models.request_models import SymptomRequest
 from app.models.response_models import SymptomAnalysisResponse
 from app.agents.symptom_analysis.agent import symptom_agent
+from app.agents.doctor_finder.agent import doctor_agent
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/analyze-symptoms", response_model=SymptomAnalysisResponse)
 async def analyze_symptoms(request: SymptomRequest):
-    """
-    Analyze symptoms and provide triage recommendations
-    """
     try:
         conversation_id = str(uuid.uuid4())
-        
         logger.info(f"Processing symptom analysis: {conversation_id}")
-        
-        initial_state = {
+
+        # Initial shared state
+        state = {
             "symptoms": request.symptoms,
             "duration": request.duration,
             "age": request.age,
@@ -32,39 +30,47 @@ async def analyze_symptoms(request: SymptomRequest):
             "is_emergency": False,
             "conversation_id": conversation_id
         }
-        
-        result = symptom_agent.invoke(initial_state)
-        
-        logger.info(f"Analysis complete: {conversation_id} - Severity: {result['severity_classification']}")
-        
+
+        # STEP 1: Symptom analysis agent
+        state = symptom_agent.invoke(state)
+
+        # STEP 2: Doctor matching agent (ALWAYS)
+        state = doctor_agent.invoke(state)
+
+        logger.info(
+            f"Journey complete: {conversation_id} | "
+            f"Severity={state.get('severity_classification')} | "
+            f"Doctors={len(state.get('matched_doctors', []))}"
+        )
+
         return SymptomAnalysisResponse(
-        # Classification
-        severity=result["severity_classification"],
-        is_emergency=result.get("is_emergency", False),
-        requires_doctor=result.get("requires_doctor", False),
-        urgency_level=result.get("urgency_level", "routine"),
-        confidence_score=result.get("confidence_score"),
+            # Classification
+            severity=state["severity_classification"],
+            is_emergency=state.get("is_emergency", False),
+            requires_doctor=state.get("requires_doctor", False),
+            urgency_level=state.get("urgency_level", "routine"),
+            confidence_score=state.get("confidence_score"),
 
-        # Analysis
-        primary_analysis=result.get("primary_analysis"),
-        differential_diagnosis=result.get("differential_diagnosis"),
-        reasoning=result.get("reasoning"),
-        red_flags=result.get("red_flags"),
+            # Analysis
+            primary_analysis=state.get("primary_analysis"),
+            differential_diagnosis=state.get("differential_diagnosis"),
+            reasoning=state.get("reasoning"),
+            red_flags=state.get("red_flags"),
 
-        # Recommendations
-        immediate_actions=result.get("immediate_actions", ["Monitor symptoms"]),
-        home_care_advice=result.get("home_care_advice"),
-        when_to_seek_help=result.get("when_to_seek_help"),
-        preparation_for_doctor=result.get("preparation_for_doctor"),
+            # Recommendations
+            immediate_actions=state.get("immediate_actions", []),
+            home_care_advice=state.get("home_care_advice"),
+            when_to_seek_help=state.get("when_to_seek_help"),
+            preparation_for_doctor=state.get("preparation_for_doctor"),
 
-        # Metadata
-        conversation_id=result["conversation_id"],
-        timestamp=datetime.now().isoformat(),
-    )
-        
+            # Doctor matching (NEW)
+            matched_doctors=state.get("matched_doctors", []),
+
+            # Metadata
+            conversation_id=state["conversation_id"],
+            timestamp=datetime.now().isoformat(),
+        )
+
     except Exception as e:
         logger.error(f"Error analyzing symptoms: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error analyzing symptoms: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Internal server error")
