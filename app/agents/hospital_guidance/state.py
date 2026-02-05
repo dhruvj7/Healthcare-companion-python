@@ -39,6 +39,18 @@ class AppointmentStatus(Enum):
     RESCHEDULED = "rescheduled"
 
 class HospitalGuidanceState(TypedDict):
+    # ===== EVENT SYSTEM =====
+    current_event: Optional[Dict[str, Any]]  # Currently processing event
+    event_history: List[Dict[str, Any]]      # All events received
+    last_location_update: Optional[datetime]
+    detected_area: Optional[str]             # Current detected area
+    
+    # ===== AUTONOMOUS FLOW =====
+    autonomous_mode: bool                    # Is agent running autonomously?
+    target_stage: Optional[str]              # Where agent is trying to get patient to
+    steps_pending: List[str]                 # Steps agent needs to execute
+    auto_progression_enabled: bool           # Allow automatic stage progression?
+    
     # ===== SESSION INFO =====
     session_id: str
     patient_id: str
