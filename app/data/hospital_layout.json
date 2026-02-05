@@ -1,0 +1,379 @@
+{
+  "hospital_id": "hospital_001",
+  "hospital_name": "City General Hospital",
+  "buildings": {
+    "A": {
+      "name": "Main Building",
+      "description": "Primary patient care and administration",
+      "floors": {
+        "1": {
+          "name": "Ground Floor",
+          "locations": {
+            "main_entrance": {
+              "id": "main_entrance",
+              "name": "Main Entrance",
+              "type": "entrance",
+              "x": 0,
+              "y": 0,
+              "description": "Primary hospital entrance"
+            },
+            "registration": {
+              "id": "registration",
+              "name": "Registration Desk",
+              "type": "registration",
+              "x": 20,
+              "y": 0,
+              "description": "Check-in and registration",
+              "hours": "24/7"
+            },
+            "elevator_a1": {
+              "id": "elevator_a1",
+              "name": "Elevator Bank A",
+              "type": "elevator",
+              "x": 50,
+              "y": 0,
+              "accessible": true
+            },
+            "elevator_a2": {
+              "id": "elevator_a2",
+              "name": "Elevator Bank B",
+              "type": "elevator",
+              "x": 50,
+              "y": 30,
+              "accessible": true
+            },
+            "cafeteria": {
+              "id": "cafeteria",
+              "name": "Main Cafeteria",
+              "type": "food",
+              "x": 80,
+              "y": 0,
+              "description": "Hospital cafeteria and dining area",
+              "hours": "6:00 AM - 8:00 PM"
+            },
+            "pharmacy": {
+              "id": "pharmacy",
+              "name": "Hospital Pharmacy",
+              "type": "pharmacy",
+              "x": 100,
+              "y": 0,
+              "description": "Prescription pickup and medications",
+              "hours": "8:00 AM - 6:00 PM"
+            },
+            "restroom_1a": {
+              "id": "restroom_1a",
+              "name": "Restroom 1A",
+              "type": "restroom",
+              "x": 30,
+              "y": 10,
+              "accessible": true
+            },
+            "gift_shop": {
+              "id": "gift_shop",
+              "name": "Gift Shop",
+              "type": "shop",
+              "x": 70,
+              "y": 10,
+              "hours": "9:00 AM - 5:00 PM"
+            },
+            "atm": {
+              "id": "atm",
+              "name": "ATM",
+              "type": "amenity",
+              "x": 40,
+              "y": 5
+            },
+            "information_desk": {
+              "id": "information_desk",
+              "name": "Information Desk",
+              "type": "information",
+              "x": 10,
+              "y": 0,
+              "hours": "7:00 AM - 7:00 PM"
+            }
+          }
+        },
+        "2": {
+          "name": "Second Floor - Outpatient",
+          "locations": {
+            "waiting_room_2a": {
+              "id": "waiting_room_2a",
+              "name": "Waiting Room 2A",
+              "type": "waiting_room",
+              "x": 10,
+              "y": 20,
+              "capacity": 30
+            },
+            "waiting_room_2b": {
+              "id": "waiting_room_2b",
+              "name": "Waiting Room 2B",
+              "type": "waiting_room",
+              "x": 60,
+              "y": 20,
+              "capacity": 20
+            },
+            "exam_room_201": {
+              "id": "exam_room_201",
+              "name": "Exam Room 201",
+              "type": "exam_room",
+              "x": 30,
+              "y": 20
+            },
+            "exam_room_202": {
+              "id": "exam_room_202",
+              "name": "Exam Room 202",
+              "type": "exam_room",
+              "x": 35,
+              "y": 20
+            },
+            "exam_room_203": {
+              "id": "exam_room_203",
+              "name": "Exam Room 203",
+              "type": "exam_room",
+              "x": 40,
+              "y": 20
+            },
+            "exam_room_204": {
+              "id": "exam_room_204",
+              "name": "Exam Room 204",
+              "type": "exam_room",
+              "x": 45,
+              "y": 20
+            },
+            "exam_room_205": {
+              "id": "exam_room_205",
+              "name": "Exam Room 205",
+              "type": "exam_room",
+              "x": 50,
+              "y": 20
+            },
+            "lab": {
+              "id": "lab",
+              "name": "Laboratory",
+              "type": "lab",
+              "x": 80,
+              "y": 20,
+              "description": "Blood work and testing",
+              "hours": "7:00 AM - 5:00 PM"
+            },
+            "restroom_2a": {
+              "id": "restroom_2a",
+              "name": "Restroom 2A",
+              "type": "restroom",
+              "x": 20,
+              "y": 25,
+              "accessible": true
+            },
+            "restroom_2b": {
+              "id": "restroom_2b",
+              "name": "Restroom 2B",
+              "type": "restroom",
+              "x": 70,
+              "y": 25,
+              "accessible": true
+            },
+            "nurse_station_2a": {
+              "id": "nurse_station_2a",
+              "name": "Nurse Station 2A",
+              "type": "nurse_station",
+              "x": 25,
+              "y": 20
+            }
+          }
+        },
+        "3": {
+          "name": "Third Floor - Specialty Clinics",
+          "locations": {
+            "cardiology": {
+              "id": "cardiology",
+              "name": "Cardiology Department",
+              "type": "department",
+              "x": 20,
+              "y": 30,
+              "description": "Heart and cardiovascular care"
+            },
+            "dr_smith_office": {
+              "id": "dr_smith_office",
+              "name": "Dr. Smith's Office - Room 305",
+              "type": "doctor_office",
+              "x": 40,
+              "y": 30,
+              "doctor": "Dr. Sarah Smith",
+              "specialty": "Cardiology"
+            },
+            "dr_johnson_office": {
+              "id": "dr_johnson_office",
+              "name": "Dr. Johnson's Office - Room 310",
+              "type": "doctor_office",
+              "x": 50,
+              "y": 30,
+              "doctor": "Dr. Michael Johnson",
+              "specialty": "Internal Medicine"
+            },
+            "pulmonology": {
+              "id": "pulmonology",
+              "name": "Pulmonology Department",
+              "type": "department",
+              "x": 70,
+              "y": 30,
+              "description": "Respiratory and lung care"
+            },
+            "waiting_room_3a": {
+              "id": "waiting_room_3a",
+              "name": "Waiting Room 3A",
+              "type": "waiting_room",
+              "x": 10,
+              "y": 30,
+              "capacity": 25
+            },
+            "restroom_3a": {
+              "id": "restroom_3a",
+              "name": "Restroom 3A",
+              "type": "restroom",
+              "x": 30,
+              "y": 35,
+              "accessible": true
+            }
+          }
+        },
+        "4": {
+          "name": "Fourth Floor - Imaging",
+          "locations": {
+            "radiology": {
+              "id": "radiology",
+              "name": "Radiology Department",
+              "type": "imaging",
+              "x": 30,
+              "y": 40,
+              "description": "X-rays and imaging"
+            },
+            "mri": {
+              "id": "mri",
+              "name": "MRI Suite",
+              "type": "imaging",
+              "x": 50,
+              "y": 40,
+              "description": "MRI scans"
+            },
+            "ct_scan": {
+              "id": "ct_scan",
+              "name": "CT Scan Suite",
+              "type": "imaging",
+              "x": 70,
+              "y": 40,
+              "description": "CT imaging"
+            },
+            "waiting_room_4a": {
+              "id": "waiting_room_4a",
+              "name": "Imaging Waiting Room",
+              "type": "waiting_room",
+              "x": 20,
+              "y": 40,
+              "capacity": 15
+            }
+          }
+        }
+      }
+    },
+    "B": {
+      "name": "Medical Tower",
+      "description": "Specialized services and emergency",
+      "floors": {
+        "1": {
+          "name": "Emergency Department",
+          "locations": {
+            "emergency_entrance": {
+              "id": "emergency_entrance",
+              "name": "Emergency Entrance",
+              "type": "entrance",
+              "x": 0,
+              "y": 50,
+              "description": "Emergency Department entrance"
+            },
+            "emergency_room": {
+              "id": "emergency_room",
+              "name": "Emergency Room",
+              "type": "emergency",
+              "x": 20,
+              "y": 50,
+              "hours": "24/7"
+            },
+            "trauma_bay": {
+              "id": "trauma_bay",
+              "name": "Trauma Bay",
+              "type": "emergency",
+              "x": 30,
+              "y": 50,
+              "hours": "24/7"
+            }
+          }
+        },
+        "2": {
+          "name": "Surgical Services",
+          "locations": {
+            "surgery_waiting": {
+              "id": "surgery_waiting",
+              "name": "Surgical Waiting Room",
+              "type": "waiting_room",
+              "x": 10,
+              "y": 60,
+              "capacity": 40
+            },
+            "pre_op": {
+              "id": "pre_op",
+              "name": "Pre-Operative Area",
+              "type": "surgical",
+              "x": 30,
+              "y": 60
+            },
+            "or_1": {
+              "id": "or_1",
+              "name": "Operating Room 1",
+              "type": "surgical",
+              "x": 50,
+              "y": 60
+            },
+            "or_2": {
+              "id": "or_2",
+              "name": "Operating Room 2",
+              "type": "surgical",
+              "x": 55,
+              "y": 60
+            },
+            "recovery": {
+              "id": "recovery",
+              "name": "Recovery Room",
+              "type": "surgical",
+              "x": 70,
+              "y": 60
+            }
+          }
+        }
+      }
+    }
+  },
+  "parking": {
+    "garage_a": {
+      "name": "Parking Garage A",
+      "type": "parking",
+      "entrance": "Main Street",
+      "levels": 5,
+      "accessible_spots": 50
+    },
+    "garage_b": {
+      "name": "Parking Garage B",
+      "type": "parking",
+      "entrance": "Oak Street",
+      "levels": 3,
+      "accessible_spots": 30
+    }
+  },
+  "outdoor_areas": {
+    "healing_garden": {
+      "name": "Healing Garden",
+      "type": "outdoor",
+      "location": "Between Buildings A and B",
+      "description": "Peaceful outdoor space"
+    }
+  }
+}
