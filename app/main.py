@@ -27,6 +27,11 @@ async def lifespan(app: FastAPI):
 
     print("✅ Database initialized and sample data seeded successfully")
 
+    await init_db()
+    await seed_sample_data()
+
+    print("✅ Database initialized and sample data seeded successfully")
+
     yield
     # Shutdown logic here
     logger.info("Shutting down Healthcare AI Service...")
