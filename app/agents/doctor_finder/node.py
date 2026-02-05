@@ -3,31 +3,23 @@ from app.agents.symptom_analysis.state import (
     SymptomAnalysisState, 
    
 )
+from typing import Dict, Any
+
+from app.agents.doctor_finder.llm_helper import llm_resolve_specialty
+from app.data.dummy_doctor import DOCTORS_DB
+from app.data.speciality import DISEASE_SPECIALTY_MAP
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def doctor_matching_node(state: SymptomAnalysisState):
-    specialties = state["suggested_specialties"]
+    specialties = state.get("suggested_specialties", [])
     emergency = state.get("is_emergency", False)
 
-    DOCTORS_DB = [
-        {
-            "name": "Dr. A. Sharma",
-            "specialty": "Cardiology",
-            "hospital": "City Heart Hospital",
-            "emergency_supported": True
-        },
-        {
-            "name": "Dr. R. Mehta",
-            "specialty": "General Medicine",
-            "hospital": "CarePlus Clinic",
-            "emergency_supported": False
-        },
-          {
-            "name": "Dr. Rm sharma",
-            "specialty": "Neurology",
-            "hospital": "CarePlus Clinic",
-            "emergency_supported": False
-        }
-    ]
+    logger.info(f"Doctor matching started")
+    logger.info(f"Suggested specialties: {specialties}")
+    logger.info(f"Emergency case: {emergency}")
 
     matched = [
         d for d in DOCTORS_DB
@@ -35,37 +27,65 @@ def doctor_matching_node(state: SymptomAnalysisState):
         and (not emergency or d["emergency_supported"])
     ]
 
+    logger.info(f"Matched doctors count: {len(matched)}")
+
     return {
         **state,
         "matched_doctors": matched
     }
-DIAGNOSIS_TO_SPECIALTY = {
-    "heart attack": "Cardiology",
-    "chest pain": "Cardiology",
-    "asthma": "Pulmonology",
-    "pneumonia": "Pulmonology",
-    "migraine": "Neurology",
-    "stroke": "Neurology",
-    "fever": "General Medicine"
-}
 
-def resolve_specialties(state: SymptomAnalysisState):
+
+
+
+
+
+def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
     diagnoses = state.get("differential_diagnosis") or []
     keywords = state.get("symptom_keywords") or []
 
-    specialties = set()
+    logger.info("Resolving medical specialty")
+    logger.info(f"Diagnoses received: {diagnoses}")
+    logger.info(f"Symptom keywords received: {keywords}")
 
-    for d in diagnoses + keywords:
-        d_lower = d.lower()
-        for k, v in DIAGNOSIS_TO_SPECIALTY.items():
-            if k in d_lower:
-                specialties.add(v)
+    combined_text = ", ".join(diagnoses + keywords)
+    logger.info(f"Combined text for LLM: {combined_text}")
 
-    if not specialties:
-        specialties.add("General Medicine")
+    # ---------------- 1. LLM GUESS ----------------
+    llm_specialty = llm_resolve_specialty(combined_text)
+    logger.info(f"LLM predicted specialty: {llm_specialty}")
+
+    # ---------------- 2. RULE-BASED VERIFICATION ----------------
+    rule_specialties = set()
+
+    for text in diagnoses + keywords:
+        text_lower = text.lower()
+        for disease, specialty in DISEASE_SPECIALTY_MAP.items():
+            if disease.lower() in text_lower:
+                rule_specialties.add(specialty)
+
+    logger.info(f"Rule-based specialties found: {list(rule_specialties)}")
+
+    # ---------------- 3. FINAL DECISION LOGIC ----------------
+    if llm_specialty and llm_specialty in rule_specialties:
+        final_specialty = llm_specialty
+        decision_reason = "LLM + rule-based agreement"
+
+    elif rule_specialties:
+        final_specialty = list(rule_specialties)[0]
+        decision_reason = "Rule-based fallback"
+
+    elif llm_specialty:
+        final_specialty = llm_specialty
+        decision_reason = "LLM-only fallback"
+
+    else:
+        final_specialty = "General Medicine"
+        decision_reason = "Safe default fallback"
+
+    logger.info(f"Final specialty selected: {final_specialty}")
+    logger.info(f"Decision reason: {decision_reason}")
 
     return {
         **state,
-        "suggested_specialties": list(specialties)
+        "suggested_specialties": [final_specialty],
     }
-

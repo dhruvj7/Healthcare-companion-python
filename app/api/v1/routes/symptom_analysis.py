@@ -62,6 +62,8 @@ async def analyze_symptoms(request: SymptomRequest):
             home_care_advice=state.get("home_care_advice"),
             when_to_seek_help=state.get("when_to_seek_help"),
             preparation_for_doctor=state.get("preparation_for_doctor"),
+            # Suggested Specilaities,
+            suggested_specialties=state.get("suggested_specialties"),
 
             # Doctor matching (NEW)
             matched_doctors=state.get("matched_doctors", []),
