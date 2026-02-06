@@ -1,0 +1,9 @@
+# Gemini API
+GOOGLE_API_KEY=api-key
+
+# Email Configuration (Optional - for production) need to configure to run locally - password, username and host
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=john.doe@example.com
+SMTP_PASSWORD=SMTP_PASSWORD
+SMTP_FROM_EMAIL=john.doe@example.com
