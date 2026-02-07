@@ -137,6 +137,8 @@ async def validate_insurance_details(session_id: str, request: InsuranceValidati
         # Build response
         is_valid = result.get("insurance_verified", False)
         validation_errors = result.get("insurance_validation_errors", [])
+        if validation_errors is None:
+            validation_errors = []
 
         if is_valid:
             logger.info(f"✅ Insurance validation SUCCESSFUL for session {session_id}")
