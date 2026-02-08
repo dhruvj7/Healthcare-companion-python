@@ -80,7 +80,7 @@ class ConversationHistoryResponse(BaseModel):
 
 # ===== ENDPOINTS =====
 
-@router.post("/chat", response_model=ChatResponse, status_code=status.HTTP_200_OK)
+@router.post("/unifiedchat", response_model=ChatResponse, status_code=status.HTTP_200_OK)
 async def unified_chat(request: ChatRequest):
     """
     **Unified Chat Endpoint**

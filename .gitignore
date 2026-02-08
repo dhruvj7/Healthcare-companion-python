@@ -9,9 +9,10 @@ venv/
 *.egg-info/
 .python-version
 pyproject.toml
-# angular dependecies 
-frontend\angular\node_modules
+# Angular dependencies
 frontend\angular\.angular
+frontend\angular\node_modules\*
+/frontend/angular - Copy
 #gitignore file
 .gitignore
 
