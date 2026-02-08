@@ -1,0 +1,89 @@
+/* src/styles.css - Global Styles */
+
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f7fafc;
+}
+
+/* Markdown Styling */
+.message-text h1,
+.message-text h2,
+.message-text h3 {
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.message-text h1 { font-size: 1.5em; }
+.message-text h2 { font-size: 1.3em; }
+.message-text h3 { font-size: 1.1em; }
+
+.message-text p {
+  margin-bottom: 10px;
+}
+
+.message-text ul,
+.message-text ol {
+  margin-left: 20px;
+  margin-bottom: 10px;
+}
+
+.message-text li {
+  margin-bottom: 5px;
+}
+
+.message-text strong {
+  font-weight: 600;
+}
+
+.message-text code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.message-text pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.message-text a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.message-user .message-text a {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Button resets */
+button {
+  font-family: inherit;
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}

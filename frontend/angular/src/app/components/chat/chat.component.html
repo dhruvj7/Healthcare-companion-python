@@ -1,0 +1,115 @@
+<!-- src/app/components/chat/chat.component.html -->
+
+<div class="chat-container">
+  <!-- Header -->
+  <div class="chat-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>🏥 Healthcare Companion</h1>
+        <p class="header-subtitle">AI-Powered Healthcare Assistant</p>
+      </div>
+      <div class="header-actions">
+        <span *ngIf="sessionId" class="session-badge">
+          Session: {{ sessionId.substring(0, 8) }}...
+        </span>
+        <button class="btn-clear" (click)="clearChat()" title="Clear conversation">
+          🗑️ Clear
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Messages Container -->
+  <div class="messages-container" #messagesContainer>
+    <!-- Welcome / Example Prompts (shown when no messages) -->
+    <div *ngIf="messages.length === 1" class="examples-section">
+      <h3>Try asking:</h3>
+      <div class="examples-grid">
+        <button
+          *ngFor="let example of examplePrompts"
+          class="example-prompt"
+          (click)="useExample(example)"
+        >
+          {{ example }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div
+      *ngFor="let message of messages"
+      class="message"
+      [ngClass]="{
+        'message-user': message.role === 'user',
+        'message-assistant': message.role === 'assistant',
+        'message-loading': message.isLoading
+      }"
+    >
+      <div class="message-avatar">
+        <span *ngIf="message.role === 'user'">👤</span>
+        <span *ngIf="message.role === 'assistant'">🤖</span>
+      </div>
+
+      <div class="message-content">
+        <div class="message-header">
+          <span class="message-sender">
+            {{ message.role === 'user' ? 'You' : 'AI Assistant' }}
+          </span>
+          <span class="message-time">
+            {{ formatTimestamp(message.timestamp) }}
+          </span>
+        </div>
+
+        <!-- Intent Badge (for assistant messages) -->
+        <div *ngIf="message.role === 'assistant' && message.intent" class="message-meta">
+          <span
+            class="intent-badge"
+            [ngClass]="'intent-' + getIntentBadgeColor(message.intent)"
+          >
+            {{ getIntentDisplayName(message.intent) }}
+          </span>
+          <span *ngIf="message.confidence" class="confidence-badge">
+            {{ (message.confidence * 100).toFixed(0) }}% confidence
+          </span>
+        </div>
+
+        <!-- Message Text -->
+        <div class="message-text" [innerHTML]="message.content | safeHtml"></div>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div *ngIf="error" class="error-message">
+      ⚠️ {{ error }}
+    </div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-container">
+    <div class="input-wrapper">
+      <textarea
+        [(ngModel)]="userInput"
+        (keypress)="onKeyPress($event)"
+        placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+        class="message-input"
+        rows="1"
+        [disabled]="isLoading"
+      ></textarea>
+
+      <button
+        (click)="sendMessage()"
+        [disabled]="!userInput.trim() || isLoading"
+        class="btn-send"
+        [class.btn-loading]="isLoading"
+      >
+        <span *ngIf="!isLoading">📤 Send</span>
+        <span *ngIf="isLoading">⏳ Sending...</span>
+      </button>
+    </div>
+
+    <div class="input-hint">
+      💡 <strong>Tip:</strong> Just type naturally! The AI will automatically understand
+      whether you need symptom analysis, insurance help, appointment booking, or anything else.
+    </div>
+  </div>
+</div>

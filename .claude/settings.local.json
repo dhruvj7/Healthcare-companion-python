@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(diagnose.bat)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

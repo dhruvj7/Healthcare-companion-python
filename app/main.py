@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from app.api.v1.routes import appointment_scheduler, symptom_analysis
 from app.api.v1.routes import hospital_guidance
 from app.api.v1.routes import insurance
+from app.api.v1.routes import unified_chat
 from app.api.middleware.error_handler import error_handler_middleware
 from app.api.middleware.logging_middleware import logging_middleware
 from app.core.config import settings
@@ -75,6 +76,13 @@ app.include_router(
     insurance.router,
     prefix="/api/v1/insurance",
     tags=["Insurance Validation"]
+)
+
+# ===== UNIFIED CHAT ENDPOINT (Main Entry Point) =====
+app.include_router(
+    unified_chat.router,
+    prefix="/api/v1/chat",
+    tags=["Unified Chat (AI Orchestrator)"]
 )
 
 # Share active sessions with insurance router
