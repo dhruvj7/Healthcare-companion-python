@@ -1,11 +1,5 @@
 # app/api/v1/routes/unified_chat.py
 
-"""
-Unified Chat API
-
-Single endpoint for all user interactions - automatically routes to appropriate agents.
-"""
-
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
@@ -23,8 +17,8 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     """Request model for chat endpoint"""
     message: str = Field(..., description="User's message/prompt", min_length=1)
-    session_id: Optional[str] = Field(None, description="Session ID for conversation continuity")
-    context: Optional[Dict[str, Any]] = Field(None, description="Additional context (user profile, location, etc.)")
+    session_id: Optional[str] = Field(default=None)#, description="Session ID for conversation continuity")
+    context: Optional[Dict[str, Any]] = Field(default=None)#, description="Additional context (user profile, location, etc.)")
 
     class Config:
         json_schema_extra = {
@@ -80,55 +74,8 @@ class ConversationHistoryResponse(BaseModel):
 
 # ===== ENDPOINTS =====
 
-@router.post("/unifiedchat", response_model=ChatResponse, status_code=status.HTTP_200_OK)
+@router.post("/chat", response_model=ChatResponse, status_code=status.HTTP_200_OK)
 async def unified_chat(request: ChatRequest):
-    """
-    **Unified Chat Endpoint**
-
-    This is the main entry point for all user interactions. Send any message here,
-    and the system will automatically:
-    1. Classify the intent (what you need help with)
-    2. Route to the appropriate specialized agent
-    3. Return a processed response
-
-    **Supported Intents:**
-    - 💊 **Symptom Analysis**: "I have a headache and fever"
-    - 🏥 **Insurance Verification**: "Verify my Blue Cross insurance"
-    - 📅 **Appointment Booking**: "Book appointment with cardiologist"
-    - 🧭 **Hospital Navigation**: "Where is the cafeteria?"
-    - ❓ **General Health Questions**: "What is diabetes?"
-    - 🚨 **Emergency Detection**: "Severe chest pain, can't breathe"
-
-    **Examples:**
-
-    ```json
-    {
-      "message": "I have been experiencing chest pain and shortness of breath for 2 hours",
-      "session_id": null
-    }
-    ```
-
-    ```json
-    {
-      "message": "I want to verify my insurance with Blue Cross Blue Shield, policy number ABC123456",
-      "session_id": "session_abc123"
-    }
-    ```
-
-    ```json
-    {
-      "message": "Book me an appointment with a dermatologist next week",
-      "session_id": "session_abc123"
-    }
-    ```
-
-    **Response:**
-    The response contains:
-    - Detected intent and confidence
-    - Processed result from the appropriate agent
-    - Follow-up questions if more info is needed
-    - Session ID for conversation continuity
-    """
     try:
         logger.info(f"Received chat request: '{request.message[:100]}...'")
 
@@ -209,7 +156,7 @@ async def clear_conversation(session_id: str):
 
     **Example:**
     ```
-    DELETE /api/v1/chat/conversation/session_abc123
+    DELETE /api/v1/public/conversation/session_abc123
     ```
     """
     try:

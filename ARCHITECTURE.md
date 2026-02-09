@@ -120,7 +120,7 @@ Return to User
 
 **File:** `app/api/v1/routes/unified_chat.py`
 
-**Endpoint:** `POST /api/v1/chat/chat`
+**Endpoint:** `POST /api/v1/public/chat`
 
 **Request:**
 ```json
@@ -182,7 +182,7 @@ Return to User
    ↓
 2. ANGULAR UI
    - ChatService.sendMessage()
-   - POST /api/v1/chat/chat
+   - POST /api/v1/public/chat
    ↓
 3. UNIFIED API ENDPOINT
    - Receives request
@@ -349,7 +349,7 @@ def test_orchestrator_symptom():
 ```python
 # Test full flow via API
 def test_chat_endpoint():
-    response = client.post("/api/v1/chat/chat", json={
+    response = client.post("/api/v1/public/chat", json={
         "message": "I have a fever"
     })
     assert response.status_code == 200
@@ -472,7 +472,7 @@ export const environment = {
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/v1/chat/chat` | POST | Main unified endpoint |
+| `/api/v1/public/chat` | POST | Main unified endpoint |
 | `/api/v1/chat/conversation/{id}` | GET | Get chat history |
 | `/api/v1/chat/conversation/{id}` | DELETE | Clear history |
 | `/api/v1/chat/capabilities` | GET | Get system capabilities |

@@ -15,7 +15,7 @@ A complete **AI-powered healthcare orchestration system** with automatic intent 
 - 🔍 **Entity Extraction:** Automatically pull out key information
 
 ### 2. **Unified API Endpoint**
-- **Single Entry Point:** `POST /api/v1/chat/chat`
+- **Single Entry Point:** `POST /api/v1/public/chat`
 - **Automatic Routing:** No manual tool selection needed
 - **Session Management:** Conversation continuity
 - **Context-Aware:** Uses chat history for better understanding
@@ -125,7 +125,7 @@ frontend/angular/src/app/
 
 ### Option 2: Use cURL
 ```bash
-curl -X POST http://localhost:8000/api/v1/chat/chat \
+curl -X POST http://localhost:8000/api/v1/public/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "I have a fever and cough"}'
 ```
@@ -135,7 +135,7 @@ curl -X POST http://localhost:8000/api/v1/chat/chat \
 import requests
 
 response = requests.post(
-    'http://localhost:8000/api/v1/chat/chat',
+    'http://localhost:8000/api/v1/public/chat',
     json={'message': 'I have a headache'}
 )
 

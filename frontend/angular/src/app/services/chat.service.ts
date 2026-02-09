@@ -17,7 +17,7 @@ import {
   providedIn: 'root'
 })
 export class ChatService {
-  private apiUrl = `${environment.apiUrl}/chat`;
+  private apiUrl = `${environment.apiUrl}/public`;
   private sessionId: string | null = null;
 
   // BehaviorSubject to manage conversation state

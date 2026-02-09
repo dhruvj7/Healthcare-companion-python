@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     # Startup logic here
     await init_db()
     await seed_sample_data()
-    print("✅ Database initialized and sample data seeded successfully")
+    logger.info("Database initialized and sample data seeded successfully")
 
     yield
     # Shutdown logic here
@@ -81,7 +81,7 @@ app.include_router(
 # ===== UNIFIED CHAT ENDPOINT (Main Entry Point) =====
 app.include_router(
     unified_chat.router,
-    prefix="/api/v1/chat",
+    prefix="/api/v1/public",
     tags=["Unified Chat (AI Orchestrator)"]
 )
 

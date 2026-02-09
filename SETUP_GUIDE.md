@@ -132,14 +132,14 @@ This guide will help you set up both the backend (Python/FastAPI) and frontend (
 
 ```bash
 # Symptom Analysis Example
-curl -X POST http://localhost:8000/api/v1/chat/chat \
+curl -X POST http://localhost:8000/api/v1/public/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "I have a fever and cough for 3 days"
   }'
 
 # Insurance Verification Example
-curl -X POST http://localhost:8000/api/v1/chat/chat \
+curl -X POST http://localhost:8000/api/v1/public/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Verify my Blue Cross insurance policy ABC123456",
@@ -147,7 +147,7 @@ curl -X POST http://localhost:8000/api/v1/chat/chat \
   }'
 
 # General Health Question
-curl -X POST http://localhost:8000/api/v1/chat/chat \
+curl -X POST http://localhost:8000/api/v1/public/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "What is diabetes?"
@@ -161,7 +161,7 @@ import requests
 
 # Send a message
 response = requests.post(
-    'http://localhost:8000/api/v1/chat/chat',
+    'http://localhost:8000/api/v1/public/chat',
     json={
         'message': 'I have chest pain and shortness of breath'
     }
@@ -221,7 +221,7 @@ The system automatically detects intent from these types of messages:
 
 ### Unified Chat API (Main Entry Point)
 
-**POST** `/api/v1/chat/chat`
+**POST** `/api/v1/public/chat`
 - Main endpoint for all interactions
 - Automatically routes to appropriate agent
 
@@ -292,7 +292,7 @@ The Angular UI includes:
 ```
 User Input
     ↓
-[Angular UI] → POST /api/v1/chat/chat
+[Angular UI] → POST /api/v1/public/chat
     ↓
 [Intent Classifier (LLM)]
     ↓

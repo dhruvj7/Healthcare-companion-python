@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:8080",
         "http://localhost:3000",
+        "http://localhost:4200",
     ]
     
     # AI/LLM Configuration
