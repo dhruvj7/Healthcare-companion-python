@@ -6,25 +6,37 @@ from app.agents.symptom_analysis.state import (
 from typing import Dict, Any
 
 from app.agents.doctor_finder.llm_helper import llm_resolve_specialty
-from app.data.dummy_doctor import DOCTORS_DB
 from app.data.speciality import DISEASE_SPECIALTY_MAP
+from app.agents.appointment_scheduler.crud import get_all_doctors
+import aiosqlite
+from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+DATABASE_PATH = BASE_DIR / "database" / "appointments.db"
 
-def doctor_matching_node(state: SymptomAnalysisState):
+
+async def doctor_matching_node(state: SymptomAnalysisState):
     specialties = state.get("suggested_specialties", [])
     emergency = state.get("is_emergency", False)
+
+    #fetching doctors from the database
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row  # Enable dict-like access
+        doctors_list = await get_all_doctors(db)
+    
+    logger.info(f"Total doctors fetched: {len(doctors_list)}")
 
     logger.info(f"Doctor matching started")
     logger.info(f"Suggested specialties: {specialties}")
     logger.info(f"Emergency case: {emergency}")
 
     matched = [
-        d for d in DOCTORS_DB
+        d for d in doctors_list
         if d["specialty"] in specialties
-        and (not emergency or d["emergency_supported"])
+        #and (not emergency or d["emergency_supported"])
     ]
 
     logger.info(f"Matched doctors count: {len(matched)}")
