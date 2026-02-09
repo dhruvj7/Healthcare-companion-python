@@ -611,3 +611,86 @@ class AppointmentInfo(BaseModel):
                 "created_at": "2026-02-05T10:30:00"
             }
         }
+
+
+class JourneyResponse(BaseModel):
+    """Main response for journey operations"""
+    session_id: str
+    journey_stage: JourneyStageEnum
+    patient_id: str
+    
+    # Current status
+    current_location: Optional[LocationInfo] = None
+    destination: Optional[LocationInfo] = None
+    navigation_active: bool = False
+    navigation_route: Optional[List[NavigationStep]] = None
+
+    # NEW: Nearby amenities (separate from notifications)
+    nearby_amenities: Optional[List[Amenity]] = None
+    amenities_last_updated: Optional[datetime] = None
+    
+    # Check-in status
+    check_in_completed: bool = False
+    insurance_verified: bool = False
+    forms_completed: bool = False
+    copay_paid: bool = False
+    
+    # Queue information
+    queue_status: Optional[QueueStatus] = None
+    
+    # Visit information
+    visit_started: bool = False
+    visit_ended: bool = False
+    visit_summary: Optional[str] = None
+    diagnosis: Optional[str] = None
+    prescriptions: Optional[List[Prescription]] = None
+    tests_ordered: Optional[List[TestOrder]] = None
+    
+    # Tasks
+    pending_tasks: List[Task] = []
+    completed_tasks: List[str] = []
+
+    # Current visit appointment
+    current_appointment: Optional[AppointmentInfo] = None
+    
+    # Follow-up appointment (separate from notifications!)
+    follow_up_appointment: Optional[AppointmentInfo] = None
+    
+    # Communications
+    notifications: List[Notification] = []
+    
+    # Emergency
+    emergency_active: bool = False
+    
+    # Metadata
+    last_updated: datetime
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "sess_abc123",
+                "journey_stage": "waiting",
+                "patient_id": "P123456",
+                "current_location": {
+                    "building": "A",
+                    "floor": "2",
+                    "name": "Waiting Room 2A"
+                },
+                "check_in_completed": True,
+                "queue_status": {
+                    "queue_position": 3,
+                    "estimated_wait_time": 25,
+                    "patients_ahead": 2,
+                    "last_updated": "2026-02-05T14:15:00"
+                },
+                "notifications": [
+                    {
+                        "type": "info",
+                        "title": "Wait Time Update",
+                        "message": "You're 3rd in line, estimated wait: 25 minutes",
+                        "timestamp": "2026-02-05T14:15:00"
+                    }
+                ],
+                "last_updated": "2026-02-05T14:15:00"
+            }
+        }

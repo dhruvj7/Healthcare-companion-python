@@ -35,7 +35,7 @@ async def analyze_symptoms(request: SymptomRequest):
         state = symptom_agent.invoke(state)
 
         # STEP 2: Doctor matching agent (ALWAYS)
-        state = doctor_agent.invoke(state)
+        state = await doctor_agent.ainvoke(state)
 
         logger.info(
             f"Journey complete: {conversation_id} | "
