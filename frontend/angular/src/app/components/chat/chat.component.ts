@@ -42,39 +42,43 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   constructor(private chatService: ChatService) {}
 
-  ngOnInit(): void {
-    this.chatService.messages$.subscribe(messages => {
-      this.messages = messages;
-      this.sessionId = this.chatService.getSessionId();
-    });
+  // chat.component.ts
 
-    if (this.messages.length === 0) {
-      this.addWelcomeMessage();
-    }
+ngOnInit(): void {
+  this.chatService.messages$.subscribe(messages => {
+    this.messages = messages;
+    this.sessionId = this.chatService.getSessionId();
+  });
+   console.log("sessionId",this.chatService.getSessionId() )
+  // Show welcome message only once at startup
+  if (this.chatService.getSessionId() === null) {
+    this.addWelcomeMessage();
   }
+}
+
 
   ngAfterViewChecked(): void {
     this.scrollToBottom();
   }
 
-  sendMessage(): void {
-    const message = this.userInput.trim();
-    if (!message) return;
+sendMessage(): void {
+  // this.isLoading=true
+  const message = this.userInput.trim();
+  if (!message) return;
 
-    this.isLoading = true;
-    this.error = null;
+  this.error = null;
+  this.userInput = '';
 
-    this.chatService.sendMessage(message).subscribe({
-      next: () => {
-        this.isLoading = false;
-        this.userInput = '';
-      },
-      error: () => {
-        this.error = 'Failed to send message. Please try again.';
-        this.isLoading = false;
-      }
-    });
-  }
+  this.chatService.sendMessage(message).subscribe({
+    next: () => {
+      this.userInput = '';
+      // this.isLoading=false
+    },
+    error: () => {
+      this.error = 'Failed to send message. Please try again.';
+    }
+  });
+}
 
   useExample(example: string): void {
     this.userInput = example;
@@ -116,7 +120,8 @@ Just type your question below!`,
       timestamp: new Date().toISOString()
     };
 
-    this.messages = [welcomeMessage];
+ 
+    this.chatService.pushSystemMessage(welcomeMessage);
   }
 
   getIntentBadgeColor(intent?: string): string {
