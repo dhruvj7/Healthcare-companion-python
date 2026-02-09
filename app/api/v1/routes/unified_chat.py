@@ -80,7 +80,7 @@ async def unified_chat(request: ChatRequest):
         logger.info(f"Received chat request: '{request.message[:100]}...'")
 
         # Process request through orchestrator
-        result = orchestrator.process_request(
+        result = await orchestrator.process_request(
             user_input=request.message,
             session_id=request.session_id,
             additional_context=request.context

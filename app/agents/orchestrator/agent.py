@@ -29,7 +29,7 @@ class HealthcareOrchestrator:
         self.llm = get_llm()
         self.conversation_sessions: Dict[str, List[Dict[str, Any]]] = {}
 
-    def process_request(
+    async def process_request(
         self,
         user_input: str,
         session_id: Optional[str] = None,
@@ -69,7 +69,7 @@ class HealthcareOrchestrator:
         })
 
         # Step 2: Route to Appropriate Agent
-        result = self._route_to_agent(
+        result = await self._route_to_agent(
             intent=classification.intent,
             user_input=user_input,
             extracted_entities=classification.extracted_entities,
@@ -103,7 +103,7 @@ class HealthcareOrchestrator:
 
         return response
 
-    def _route_to_agent(
+    async def _route_to_agent(
         self,
         intent: IntentType,
         user_input: str,
@@ -131,7 +131,7 @@ class HealthcareOrchestrator:
                 return self._handle_emergency(user_input, extracted_entities)
 
             elif intent == IntentType.SYMPTOM_ANALYSIS:
-                return self._handle_symptom_analysis(user_input, extracted_entities, session_id)
+                return await self._handle_symptom_analysis(user_input, extracted_entities, session_id)
 
             elif intent == IntentType.INSURANCE_VERIFICATION:
                 return self._handle_insurance_verification(user_input, extracted_entities, session_id)
@@ -176,7 +176,7 @@ class HealthcareOrchestrator:
             "disclaimer": "⚠️ This is a medical emergency. Call emergency services immediately. Do not wait."
         }
 
-    def _handle_symptom_analysis(self, user_input: str, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+    async def _handle_symptom_analysis(self, user_input: str, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
         """Handle symptom analysis using the symptom analysis agent"""
         logger.info("Handling symptom analysis request")
 
@@ -212,10 +212,10 @@ class HealthcareOrchestrator:
         }
 
         # Run symptom analysis agent
-        result_state = symptom_agent.invoke(state)
+        result_state = await symptom_agent.ainvoke(state)
 
         # Also run doctor matching
-        result_state = doctor_agent.invoke(result_state)
+        result_state = await doctor_agent.ainvoke(result_state)
 
         # Format response
         response = {
