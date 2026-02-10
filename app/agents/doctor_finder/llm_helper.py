@@ -48,8 +48,8 @@ Respond ONLY with valid JSON:
 
         data = json.loads(content)
 
-        if data.get("confidence", 0) >= 0.7:
-            return data.get("recommended_specialty")
+        if data.get("confidence", 0) >= 0.4:
+           return data.get("recommended_specialty")
 
     except Exception as e:
         logger.warning(f"LLM specialty resolution failed: {e}", exc_info=True)
