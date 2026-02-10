@@ -1,8 +1,8 @@
-# app/agents/hospital_guidance/agent.py
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 import logging
 
+from app.agents.hospital_guidance.nodes.routing_decision import llm_route_decision, route_request
 from app.agents.hospital_guidance.state import HospitalGuidanceState, JourneyStage
 from app.agents.hospital_guidance.nodes import (
     arrival,
@@ -22,161 +22,122 @@ def create_hospital_guidance_agent():
     
     # ===== NODES =====
     
+    # Entry point - routes based on intent
+    workflow.add_node("route_request", route_request)
+    
     # Arrival & Check-in
     workflow.add_node("handle_arrival", arrival.handle_arrival)
     workflow.add_node("initiate_check_in", arrival.initiate_check_in)
     workflow.add_node("complete_check_in", arrival.complete_check_in)
     
     # Navigation
-    workflow.add_node("provide_navigation", lambda state: navigation.provide_navigation(state, state.get("navigation_query", "")))
+    workflow.add_node("provide_navigation", navigation.provide_navigation)
     workflow.add_node("find_amenities", navigation.find_nearby_amenities)
-    workflow.add_node("update_location", lambda state: navigation.update_location(state, state.get("new_location", {})))
+    workflow.add_node("update_location", navigation.update_location)
     
     # Queue & Wait Management
     workflow.add_node("update_wait_time", queue_management.update_wait_time)
     workflow.add_node("suggest_activities", queue_management.suggest_activities_while_waiting)
-    workflow.add_node("notify_family", lambda state: queue_management.notify_family(state, state.get("family_message", "")))
+    workflow.add_node("notify_family", queue_management.notify_family)
     
     # Visit Assistance
     workflow.add_node("start_visit", visit_assistance.start_visit)
-    workflow.add_node("explain_term", lambda state: visit_assistance.explain_medical_term(state, state.get("medical_term", "")))
-    workflow.add_node("capture_notes", lambda state: visit_assistance.capture_visit_notes(state, state.get("visit_notes", "")))
+    workflow.add_node("explain_term", visit_assistance.explain_medical_term)
+    workflow.add_node("capture_notes", visit_assistance.capture_visit_notes)
     workflow.add_node("generate_questions", visit_assistance.generate_question_prompts)
-    workflow.add_node("record_prescription", lambda state: visit_assistance.record_prescription(
-        state,
-        state.get("medication", ""),
-        state.get("dosage", ""),
-        state.get("frequency", ""),
-        state.get("instructions", "")
-    ))
-    workflow.add_node("record_test", lambda state: visit_assistance.record_test_order(
-        state,
-        state.get("test_name", ""),
-        state.get("test_type", ""),
-        state.get("urgency", ""),
-        state.get("test_instructions", "")
-    ))
+    workflow.add_node("record_prescription", visit_assistance.record_prescription)
+    workflow.add_node("record_test", visit_assistance.record_test_order)
     workflow.add_node("end_visit", visit_assistance.end_visit)
     
     # Post-Visit
     workflow.add_node("create_post_visit_tasks", post_visit.create_post_visit_tasks)
-    workflow.add_node("handle_prescription", lambda state: post_visit.handle_prescription_routing(state, state.get("pharmacy_choice", "hospital")))
-    workflow.add_node("schedule_lab", lambda state: post_visit.schedule_lab_work(state, state.get("schedule_now", True)))
-    workflow.add_node("schedule_follow_up", lambda state: post_visit.schedule_follow_up(state, state.get("preferred_date")))
-    workflow.add_node("process_payment", lambda state: post_visit.process_payment(state, state.get("payment_method", "card")))
+    workflow.add_node("handle_prescription", post_visit.handle_prescription_routing)
+    workflow.add_node("schedule_lab", post_visit.schedule_lab_work)
+    workflow.add_node("schedule_follow_up", post_visit.schedule_follow_up)
+    workflow.add_node("process_payment", post_visit.process_payment)
     workflow.add_node("generate_discharge", post_visit.generate_discharge_instructions)
     workflow.add_node("initiate_departure", post_visit.initiate_departure)
     workflow.add_node("complete_journey", post_visit.complete_journey)
     
     # Emergency
-    workflow.add_node("detect_emergency", lambda state: emergency.detect_emergency(state, state.get("user_message", "")))
-    workflow.add_node("handle_emergency", lambda state: emergency.handle_emergency(state, state.get("emergency_type", "general"), state.get("user_message", "")))
+    workflow.add_node("detect_emergency", emergency.detect_emergency)
+    workflow.add_node("handle_emergency", emergency.handle_emergency)
     workflow.add_node("resolve_emergency", emergency.resolve_emergency)
-    workflow.add_node("provide_support", lambda state: emergency.provide_emotional_support(state, state.get("concern", "")))
-    
-    # ===== ROUTING LOGIC =====
-    
-    def route_by_stage(state: HospitalGuidanceState) -> str:
-        """Route based on current journey stage"""
-        
-        # Check for emergency first
-        if state.get("emergency_active"):
-            return "handle_emergency"
-        
-        stage = state.get("journey_stage")
-        
-        if stage == JourneyStage.ARRIVAL:
-            return "check_in"
-        elif stage == JourneyStage.CHECK_IN:
-            return "completing_check_in"
-        elif stage == JourneyStage.PRE_VISIT or stage == JourneyStage.WAITING:
-            return "waiting"
-        elif stage == JourneyStage.IN_VISIT:
-            return "in_visit"
-        elif stage == JourneyStage.POST_VISIT:
-            return "post_visit"
-        elif stage == JourneyStage.DEPARTURE:
-            return "departing"
-        elif stage == JourneyStage.COMPLETED:
-            return "end"
-        
-        return "arrival"
-    
-    def route_by_intent(state: HospitalGuidanceState) -> str:
-        """Route based on user intent"""
-        
-        intent = state.get("user_intent", "")
-        
-        # Intent mapping
-        intent_routes = {
-            "navigate": "provide_navigation",
-            "find_amenities": "find_amenities",
-            "check_wait": "update_wait_time",
-            "explain_term": "explain_term",
-            "emergency": "handle_emergency",
-            "support": "provide_support",
-            "complete": "end"
-        }
-        
-        return intent_routes.get(intent, "handle_arrival")
+    workflow.add_node("provide_support", emergency.provide_emotional_support)
     
     # ===== EDGES =====
     
     # Entry point
-    workflow.set_entry_point("handle_arrival")
+    workflow.set_entry_point("route_request")
     
-    # Arrival flow
-    workflow.add_edge("handle_arrival", "initiate_check_in")
-    workflow.add_edge("initiate_check_in", "complete_check_in")
-    workflow.add_edge("complete_check_in", "update_wait_time")
-    
-    # Waiting flow
-    workflow.add_edge("update_wait_time", "suggest_activities")
     workflow.add_conditional_edges(
-        "suggest_activities",
-        lambda state: "visit" if state.get("queue_position") == 1 else "wait",
-        {
-            "visit": "start_visit",
-            "wait": END
-        }
-    )
-    
-    # Visit flow
-    workflow.add_edge("start_visit", "generate_questions")
-    workflow.add_edge("generate_questions", END)
-    workflow.add_edge("end_visit", "create_post_visit_tasks")
-    
-    # Post-visit flow
-    workflow.add_edge("create_post_visit_tasks", "generate_discharge")
-    workflow.add_edge("generate_discharge", "initiate_departure")
-    workflow.add_conditional_edges(
-        "initiate_departure",
-        lambda state: "complete" if len(state.get("pending_tasks", [])) == 0 else "wait",
-        {
-            "complete": "complete_journey",
-            "wait": END
-        }
-    )
-    
-    workflow.add_edge("complete_journey", END)
-    
-    # Emergency handling
-    workflow.add_edge("handle_emergency", "resolve_emergency")
-    workflow.add_edge("resolve_emergency", END)
-    
-    # Navigation
+    "route_request",
+    llm_route_decision,
+    {
+        "provide_navigation": "provide_navigation",
+        "find_amenities": "find_amenities",
+        "update_wait_time": "update_wait_time",
+        "start_visit": "start_visit",
+        "explain_term": "explain_term",
+        "handle_arrival": "handle_arrival",
+        "initiate_check_in": "initiate_check_in",
+        "create_post_visit_tasks": "create_post_visit_tasks",
+        "initiate_departure": "initiate_departure",
+        "provide_support": "provide_support",
+        "detect_emergency": "detect_emergency",
+        "handle_emergency": "handle_emergency",
+    }
+)
+
+    # All navigation nodes end
     workflow.add_edge("provide_navigation", END)
     workflow.add_edge("find_amenities", END)
     workflow.add_edge("update_location", END)
     
-    # Support
+    # Wait/queue nodes end
+    workflow.add_edge("update_wait_time", END)
+    workflow.add_edge("suggest_activities", END)
+    workflow.add_edge("notify_family", END)
+    
+    # Visit nodes end
+    workflow.add_edge("start_visit", END)
+    workflow.add_edge("explain_term", END)
+    workflow.add_edge("capture_notes", END)
+    workflow.add_edge("generate_questions", END)
+    workflow.add_edge("record_prescription", END)
+    workflow.add_edge("record_test", END)
+    workflow.add_edge("end_visit", END)
+    
+    # Post-visit nodes end
+    workflow.add_edge("create_post_visit_tasks", END)
+    workflow.add_edge("handle_prescription", END)
+    workflow.add_edge("schedule_lab", END)
+    workflow.add_edge("schedule_follow_up", END)
+    workflow.add_edge("process_payment", END)
+    workflow.add_edge("generate_discharge", END)
+    workflow.add_edge("initiate_departure", END)
+    workflow.add_edge("complete_journey", END)
+    
+    # Emergency flow
+    workflow.add_edge("detect_emergency", "handle_emergency")
+    workflow.add_edge("handle_emergency", END)
+    workflow.add_edge("resolve_emergency", END)
     workflow.add_edge("provide_support", END)
     
+    # Arrival flow (for new journeys)
+    workflow.add_edge("handle_arrival", END)
+    workflow.add_edge("initiate_check_in", END)
+    workflow.add_edge("complete_check_in", END)
+    
     logger.info("Hospital guidance agent workflow compiled successfully")
+    
+    # return workflow.compile()
 
     graph = workflow.compile()
-    # mermaid = graph.draw_mermaid()
-    # print(mermaid)
+
+    mermaid = graph.get_graph().draw_mermaid()
+    print(mermaid)
+
     return graph
 
 # Create the agent

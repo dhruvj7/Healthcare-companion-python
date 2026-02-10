@@ -55,3 +55,7 @@ CSV_VERIFICATION_GUIDE.md
 #test_insurance_csv_verification.py
 #verify_installation.py
 #verify_router.py
+
+# Frontend (Angular)
+frontend/angular/node_modules/
+frontend/angular/.angular

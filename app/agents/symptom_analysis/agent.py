@@ -48,8 +48,8 @@ def create_symptom_analysis_workflow():
     logger.info("Symptom analysis workflow compiled successfully")
     graph = workflow.compile()
 
-    mermaid = graph.get_graph().draw_mermaid()
-    print(mermaid)
+    # mermaid = graph.get_graph().draw_mermaid()
+    # print(mermaid)
 
     return graph
 
