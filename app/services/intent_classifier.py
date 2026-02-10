@@ -99,8 +99,21 @@ You are an intelligent healthcare assistant intent classifier. Your task is to a
    - Examples: "Check my Blue Cross insurance", "verify policy ABC123", "my insurance is Aetna"
 
 3. **appointment_booking** - User wants to book an appointment or find a doctor
-   - Extract: specialty (if mentioned), preferred_date, preferred_time, reason, doctor_name
-   - Examples: "book appointment with cardiologist", "schedule checkup next week", "find a dermatologist"
+   - Extract: 
+     - specialty (if mentioned)
+     - preferred_date
+     - preferred_time
+     - reason (reason for visit)
+     - doctor_name
+     - patient_name (full name of the patient)
+     - patient_email (email address)
+     - patient_phone (phone number)
+     - appointment_type ("in-person" or "telemedicine")
+   - Examples: 
+     - "book appointment with cardiologist"
+     - "schedule checkup next week"
+     - "I want to book an appointment, my name is John Doe, email john@example.com, phone 555-1234"
+     - "Book me a telemedicine appointment for next Monday"
 
 4. **hospital_navigation** - User needs help navigating hospital, finding amenities, or asking about wait times
    - Extract: location_query, destination, amenity_type
@@ -115,19 +128,23 @@ You are an intelligent healthcare assistant intent classifier. Your task is to a
    - Keywords: "emergency", "can't breathe", "severe pain", "unconscious", "bleeding heavily"
 
 **Your Task:**
-1. Analyze the user input
+1. Analyze the user input AND conversation history for context
 2. Determine the most likely intent
-3. Extract all relevant entities/information mentioned
+3. Extract all relevant entities/information mentioned (check both current input and conversation history)
 4. Assess confidence (0.0 to 1.0)
 5. Determine if more information is needed
 6. Generate follow-up questions if needed
 
 **IMPORTANT:**
 - If symptoms include emergency keywords (chest pain, can't breathe, severe bleeding, loss of consciousness), classify as "emergency" with high confidence
-- Extract as much information as possible from the user input
+- For **appointment_booking**, extract patient details from current input OR previous conversation history
+- Extract as much information as possible from both user input and conversation context
 - If critical information is missing, set requires_more_info=true and provide follow_up_questions
+- For appointment_type, infer from context (e.g., "video call", "online", "virtual" → "telemedicine"; "visit", "in person" → "in-person")
 
 **Respond ONLY with valid JSON in this exact format:**
+
+For symptom_analysis:
 {{
   "intent": "symptom_analysis",
   "confidence": 0.95,
@@ -143,6 +160,26 @@ You are an intelligent healthcare assistant intent classifier. Your task is to a
     "How old are you?",
     "Do you have any existing medical conditions?"
   ]
+}}
+
+For appointment_booking:
+{{
+  "intent": "appointment_booking",
+  "confidence": 0.9,
+  "reasoning": "User wants to book an appointment and has provided contact details",
+  "extracted_entities": {{
+    "specialty": "cardiologist",
+    "preferred_date": "2024-03-15",
+    "preferred_time": "10:00 AM",
+    "reason": "chest pain checkup",
+    "doctor_name": null,
+    "patient_name": "John Doe",
+    "patient_email": "john@example.com",
+    "patient_phone": "555-1234",
+    "appointment_type": "in-person"
+  }},
+  "requires_more_info": false,
+  "follow_up_questions": []
 }}
 
 **Valid intent values:** symptom_analysis, insurance_verification, appointment_booking, hospital_navigation, general_health_question, emergency, unknown
@@ -170,8 +207,34 @@ You are an intelligent healthcare assistant intent classifier. Your task is to a
         requires_more_info = result.get("requires_more_info", False)
         follow_up_questions = result.get("follow_up_questions", [])
 
+        # Additional validation for appointment_booking
+        if intent == IntentType.APPOINTMENT_BOOKING:
+            required_fields = ["patient_name", "patient_email", "patient_phone", "reason"]
+            missing_fields = [field for field in required_fields 
+                            if not extracted_entities.get(field)]
+            
+            if missing_fields:
+                requires_more_info = True
+                # Generate follow-up questions for missing fields
+                field_questions = {
+                    "patient_name": "What is your full name?",
+                    "patient_email": "What is your email address?",
+                    "patient_phone": "What is your phone number?",
+                    "reason": "What is the reason for your visit?"
+                }
+                follow_up_questions = [field_questions[field] for field in missing_fields 
+                                      if field in field_questions]
+                
+                logger.info(f"Missing appointment booking fields: {missing_fields}")
+            
+            # Set default appointment_type if not specified
+            if not extracted_entities.get("appointment_type"):
+                extracted_entities["appointment_type"] = "in-person"
+
         logger.info(f"Intent classified: {intent.value} (confidence: {confidence})")
         logger.info(f"Reasoning: {reasoning}")
+        if extracted_entities:
+            logger.info(f"Extracted entities: {extracted_entities}")
 
         classification_result = IntentClassificationResult(
             intent=intent,
@@ -194,6 +257,7 @@ You are an intelligent healthcare assistant intent classifier. Your task is to a
     except Exception as e:
         logger.error(f"Error during intent classification: {e}", exc_info=True)
         return _fallback_classification(user_input)
+    
 
 
 def _fallback_classification(user_input: str) -> IntentClassificationResult:
@@ -238,16 +302,23 @@ def _fallback_classification(user_input: str) -> IntentClassificationResult:
             follow_up_questions=["What is your insurance provider name?", "What is your policy number?"]
         )
 
-    # Appointment keywords
-    appointment_keywords = ["appointment", "book", "schedule", "doctor", "visit", "consultation"]
-    if any(keyword in input_lower for keyword in appointment_keywords):
+    # Appointment booking keywords
+    booking_keywords = ["book", "appointment", "schedule", "reserve", "see doctor"]
+    if any(keyword in user_input for keyword in booking_keywords):
         return IntentClassificationResult(
             intent=IntentType.APPOINTMENT_BOOKING,
-            confidence=0.7,
-            extracted_entities={},
-            reasoning="Appointment-related keywords detected",
+            confidence=0.6,
+            extracted_entities={
+                "appointment_type": "in-person"  # Default value
+            },
+            reasoning="Appointment booking keywords detected in fallback mode",
             requires_more_info=True,
-            follow_up_questions=["Which medical specialty do you need?", "When would you like to schedule?"]
+            follow_up_questions=[
+                "What is your full name?",
+                "What is your email address?",
+                "What is your phone number?",
+                "What is the reason for your visit?"
+            ]
         )
 
     # Navigation keywords

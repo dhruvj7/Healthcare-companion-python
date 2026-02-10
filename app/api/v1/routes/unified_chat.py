@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., description="User's message/prompt", min_length=1)
     session_id: Optional[str] = Field(default=None)#, description="Session ID for conversation continuity")
     context: Optional[Dict[str, Any]] = Field(default=None)#, description="Additional context (user profile, location, etc.)")
+    booking_slot: Optional[int] = Field(default=None)#, description="Booking slot id for appointment booking")
 
     class Config:
         json_schema_extra = {
@@ -28,7 +29,8 @@ class ChatRequest(BaseModel):
                 "context": {
                     "user_age": 35,
                     "location": "hospital_lobby"
-                }
+                },
+                "booking_slot": 123
             }
         }
 
@@ -83,7 +85,8 @@ async def unified_chat(request: ChatRequest):
         result = await orchestrator.process_request(
             user_input=request.message,
             session_id=request.session_id,
-            additional_context=request.context
+            additional_context=request.context,
+            booking_slot_id=request.booking_slot
         )
 
         logger.info(f"Request processed successfully. Intent: {result['intent']}")

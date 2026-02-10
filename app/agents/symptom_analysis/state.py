@@ -1,4 +1,4 @@
-from typing import TypedDict, List, Optional
+from typing import Dict, TypedDict, List, Optional
 from enum import Enum
 
 class Severity(Enum):
@@ -51,6 +51,7 @@ class SymptomAnalysisState(TypedDict):
     suggested_specialties: Optional[List[str]]
     matched_doctors: Optional[List[dict]]
     matched_hospitals: Optional[List[dict]]
+    available_appointments: Optional[Dict[int, List[dict]]]
 
     
     # Metadata

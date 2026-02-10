@@ -87,22 +87,22 @@ async def seed_sample_data():
         
         # Insert 25 sample doctors with various specialties
         doctors = [
-            ('Dr. Sarah Smith', 'khushaal.sharma@veersatech.com', 'General Practitioner'),
+            ('Dr. Sarah Smith', 'khushaal.sharma@veersatech.com', 'General Medicine'),
             ('Dr. John Davis', 'khushaal.sharma@veersatech.com', 'Cardiologist'),
             ('Dr. Emily Chen', 'khushaal.sharma@veersatech.com', 'Pediatrician'),
-            ('Dr. Michael Brown', 'khushaal.sharma@veersatech.com', 'General Practitioner'),
+            ('Dr. Michael Brown', 'khushaal.sharma@veersatech.com', 'General Medicine'),
             ('Dr. Jessica Wilson', 'khushaal.sharma@veersatech.com', 'Dermatologist'),
             ('Dr. David Martinez', 'khushaal.sharma@veersatech.com', 'Cardiologist'),
             ('Dr. Lisa Anderson', 'khushaal.sharma@veersatech.com', 'Pediatrician'),
             ('Dr. Robert Taylor', 'khushaal.sharma@veersatech.com', 'Orthopedic Surgeon'),
-            ('Dr. Maria Garcia', 'khushaal.sharma@veersatech.com', 'General Practitioner'),
+            ('Dr. Maria Garcia', 'khushaal.sharma@veersatech.com', 'General Medicine'),
             ('Dr. James Thompson', 'khushaal.sharma@veersatech.com', 'Neurologist'),
             ('Dr. Jennifer Lee', 'khushaal.sharma@veersatech.com', 'Dermatologist'),
             ('Dr. William Harris', 'khushaal.sharma@veersatech.com', 'Cardiologist'),
             ('Dr. Amanda Clark', 'khushaal.sharma@veersatech.com', 'Pediatrician'),
             ('Dr. Christopher Lewis', 'khushaal.sharma@veersatech.com', 'Orthopedic Surgeon'),
             ('Dr. Michelle Walker', 'khushaal.sharma@veersatech.com', 'Psychiatrist'),
-            ('Dr. Daniel Hall', 'khushaal.sharma@veersatech.com', 'General Practitioner'),
+            ('Dr. Daniel Hall', 'khushaal.sharma@veersatech.com', 'General Medicine'),
             ('Dr. Rebecca Allen', 'khushaal.sharma@veersatech.com', 'Ophthalmologist'),
             ('Dr. Kevin Young', 'khushaal.sharma@veersatech.com', 'Neurologist'),
             ('Dr. Laura King', 'khushaal.sharma@veersatech.com', 'Dermatologist'),
@@ -110,7 +110,7 @@ async def seed_sample_data():
             ('Dr. Stephanie Scott', 'khushaal.sharma@veersatech.com', 'Pediatrician'),
             ('Dr. Anthony Green', 'khushaal.sharma@veersatech.com', 'Orthopedic Surgeon'),
             ('Dr. Nicole Adams', 'khushaal.sharma@veersatech.com', 'Psychiatrist'),
-            ('Dr. Matthew Baker', 'khushaal.sharma@veersatech.com', 'General Practitioner'),
+            ('Dr. Matthew Baker', 'khushaal.sharma@veersatech.com', 'General Medicine'),
             ('Dr. Elizabeth Nelson', 'khushaal.sharma@veersatech.com', 'Ophthalmologist'),
         ]
         
@@ -145,7 +145,7 @@ async def seed_sample_data():
             elif doctor_id in [17, 25]:  # Ophthalmologists
                 duration = 30
                 location = f'Ophthalmology - Room {doctor_id}'
-            else:  # General Practitioners
+            else:  # General Medicines
                 duration = 30
                 location = f'Clinic Room {doctor_id}'
             
