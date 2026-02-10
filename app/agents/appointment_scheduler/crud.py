@@ -7,7 +7,7 @@ from datetime import datetime
 async def get_all_doctors(db: aiosqlite.Connection) -> List[dict]:
     """Get all doctors"""
     cursor = await db.execute("""
-        SELECT id, name, email, specialty
+        SELECT id, name, email, specialty,department
         FROM doctors
         ORDER BY name
     """)

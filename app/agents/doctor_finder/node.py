@@ -22,7 +22,7 @@ DATABASE_PATH = BASE_DIR / "database" / "appointments.db"
 async def doctor_matching_node(state: SymptomAnalysisState):
     specialties = state.get("suggested_specialties", [])
     emergency = state.get("is_emergency", False)
-
+    normalized_specialties = {normalize(s) for s in specialties}
     #fetching doctors from the database
     async with aiosqlite.connect(DATABASE_PATH) as db:
         db.row_factory = aiosqlite.Row  # Enable dict-like access
@@ -36,7 +36,7 @@ async def doctor_matching_node(state: SymptomAnalysisState):
 
     matched = [
         d for d in doctors_list
-        if d["specialty"] in specialties
+        if normalize(d["department"]) in normalized_specialties
         #and (not emergency or d["emergency_supported"])
     ]
 
@@ -51,6 +51,8 @@ async def doctor_matching_node(state: SymptomAnalysisState):
 
 
 
+def normalize(value: str) -> str:
+    return value.lower().strip()
 
 def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
     diagnoses = state.get("differential_diagnosis") or []
@@ -60,14 +62,7 @@ def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
     logger.info(f"Diagnoses received: {diagnoses}")
     logger.info(f"Symptom keywords received: {keywords}")
 
-    combined_text = ", ".join(diagnoses + keywords)
-    logger.info(f"Combined text for LLM: {combined_text}")
-
-    # ---------------- 1. LLM GUESS ----------------
-    llm_specialty = llm_resolve_specialty(combined_text)
-    logger.info(f"LLM predicted specialty: {llm_specialty}")
-
-    # ---------------- 2. RULE-BASED VERIFICATION ----------------
+    # ---------------- 1. RULE-BASED RESOLUTION FIRST ----------------
     rule_specialties = set()
 
     for text in diagnoses + keywords:
@@ -78,19 +73,32 @@ def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
 
     logger.info(f"Rule-based specialties found: {list(rule_specialties)}")
 
-    # ---------------- 3. FINAL DECISION LOGIC ----------------
-    if llm_specialty and llm_specialty in rule_specialties:
-        final_specialty = llm_specialty
-        decision_reason = "LLM + rule-based agreement"
-
-    elif rule_specialties:
+    if rule_specialties:
         final_specialty = list(rule_specialties)[0]
-        decision_reason = "Rule-based fallback"
+        decision_reason = "Rule-based (LLM skipped)"
 
-    elif llm_specialty:
+        logger.info(f"Final specialty selected: {final_specialty}")
+        logger.info(f"Decision reason: {decision_reason}")
+
+        return {
+            **state,
+            "suggested_specialties": [final_specialty],
+        }
+
+    # ---------------- 2. LLM FALLBACK ONLY ----------------
+    combined_text = ", ".join(diagnoses + keywords)
+    logger.info(f"Combined text for LLM: {combined_text}")
+
+    try:
+        llm_specialty = llm_resolve_specialty(combined_text)
+        logger.info(f"LLM predicted specialty: {llm_specialty}")
+    except Exception as e:
+        logger.warning(f"LLM specialty resolution failed: {e}")
+        llm_specialty = None
+
+    if llm_specialty:
         final_specialty = llm_specialty
-        decision_reason = "LLM-only fallback"
-
+        decision_reason = "LLM fallback"
     else:
         final_specialty = "General Medicine"
         decision_reason = "Safe default fallback"

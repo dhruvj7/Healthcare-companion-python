@@ -160,6 +160,16 @@ export class ChatService {
     const currentMessages = this.messagesSubject.value;
     this.messagesSubject.next([...currentMessages, message]);
   }
+  // chat.service.ts
+
+/**
+ * Public method to push a message into the stream (like the welcome message)
+ */
+public pushSystemMessage(message: Message): void {
+  const currentMessages = this.messagesSubject.value;
+  this.messagesSubject.next([...currentMessages, message]);
+}
+
 
   /**
    * Remove loading message
