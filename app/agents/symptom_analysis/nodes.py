@@ -143,10 +143,10 @@ Respond ONLY with valid JSON. No markdown formatting, no explanation outside the
             age_group=state.get('age_group', AgeGroup.ADULT).value if state.get('age_group') else 'Not specified',
             symptoms=', '.join(state['symptoms']),
             duration=state.get('duration', 'Not specified'),
-            severity_score=state.get('severity_self_assessment', 'Not specified'),
-            conditions=', '.join(state.get('existing_conditions', [])) or 'None',
-            medications=', '.join(state.get('current_medications', [])) or 'None',
-            allergies=', '.join(state.get('allergies', [])) or 'None'
+            severity_score=state.get('severity_self_assessment', 'Not specified'),            
+            conditions=', '.join(state.get('existing_conditions') or []) or 'None',
+            medications=', '.join(state.get('current_medications') or []) or 'None',
+            allergies=', '.join(state.get('allergies') or []) or 'None',
         )
         
         logger.debug(f"Sending prompt to Gemini (length: {len(formatted_prompt)} chars)")

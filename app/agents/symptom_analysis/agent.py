@@ -46,7 +46,12 @@ def create_symptom_analysis_workflow():
     workflow.add_edge("finalize", END)
     
     logger.info("Symptom analysis workflow compiled successfully")
-    return workflow.compile()
+    graph = workflow.compile()
+
+    mermaid = graph.get_graph().draw_mermaid()
+    print(mermaid)
+
+    return graph
 
 # Global workflow instance
 symptom_agent = create_symptom_analysis_workflow()
