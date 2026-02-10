@@ -474,50 +474,31 @@ class HealthcareOrchestrator:
         """Handle hospital navigation requests using the hospital guidance agent"""
         logger.info("Handling hospital navigation request")
 
-        # ✅ Better extraction of location query
-        location_query = entities.get("location_query", "")
-        
-        if not location_query:
-            # Try to extract from user input using indicators
-            location_indicators = [
-                "where is", "how do i get to", "how to get to",
-                "find", "looking for", "navigate to", "directions to",
-                "take me to", "show me"
-            ]
-            
-            user_input_lower = user_input.lower()
-            for indicator in location_indicators:
-                if indicator in user_input_lower:
-                    # Extract what comes after the indicator
-                    parts = user_input_lower.split(indicator, 1)
-                    if len(parts) > 1:
-                        location_query = parts[1].strip().rstrip('?.!')
-                        break
-            
-            # If still no query, use the whole input
-            if not location_query:
-                location_query = user_input
-        
         # Get or create journey state
         journey_state = self._get_journey_state(session_id)
         
-        # Determine specific intent
-        user_intent = self._map_navigation_intent(user_input, entities)
-        
-        # Get current location from context or journey state
+        # Get current location from context or journey state (with fallback to main entrance)
         current_location = None
         if additional_context and additional_context.get("current_location"):
             current_location = additional_context.get("current_location")
-        else:
+        elif journey_state.get("current_location"):
             current_location = journey_state.get("current_location")
+        else:
+            # Default to main entrance if no location provided
+            current_location = {
+                "building": "A",
+                "building_name": "Main Building",
+                "floor": "1",
+                "room": "main_entrance",
+                "name": "Main Entrance",
+                "coordinates": {"x": 0, "y": 0}
+            }
         
-        # Build state for hospital guidance agent
+        # Build minimal state - let the agent decide what to do
         state = {
             "session_id": session_id,
             "patient_id": additional_context.get("patient_id", f"patient_{session_id}") if additional_context else f"patient_{session_id}",
             "user_message": user_input,
-            "user_intent": user_intent,
-            "navigation_query": location_query,  # ✅ This will be used by provide_navigation
             "current_location": current_location,
             "journey_stage": journey_state.get("journey_stage", JourneyStage.ARRIVAL),
             "conversation_history": journey_state.get("conversation_history", []),
@@ -532,10 +513,9 @@ class HealthcareOrchestrator:
             "last_updated": datetime.now()
         }
 
-        logger.info("Built state | intent=%s, query='%s', has_location=%s", 
-                    user_intent, location_query, current_location is not None)
+        logger.info("Invoking hospital guidance agent with message: '%s'", user_input)
         
-        # Run hospital guidance agent
+        # Run hospital guidance agent - it will handle all the routing logic
         try:
             result_state = await hospital_guidance_agent.ainvoke(state)
             

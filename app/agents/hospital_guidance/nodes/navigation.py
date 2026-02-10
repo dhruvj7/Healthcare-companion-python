@@ -8,75 +8,75 @@ from app.services.llm_service import get_llm
 
 logger = logging.getLogger(__name__)
 
-def provide_navigation(state: HospitalGuidanceState, destination_query: str) -> Dict[str, Any]:
-    """Provide navigation to a destination"""
+# def provide_navigation(state: HospitalGuidanceState, destination_query: str) -> Dict[str, Any]:
+#     """Provide navigation to a destination"""
     
-    logger.info(f"Navigation requested to: {destination_query}")
+#     logger.info(f"Navigation requested to: {destination_query}")
     
-    # Find destination
-    destination = navigation_tool.find_location(destination_query)
+#     # Find destination
+#     destination = navigation_tool.find_location(destination_query)
     
-    if not destination:
-        return {
-            **state,
-            "notifications": state.get("notifications", []) + [{
-                "type": "error",
-                "message": f"Could not find location: {destination_query}",
-                "timestamp": datetime.now()
-            }]
-        }
+#     if not destination:
+#         return {
+#             **state,
+#             "notifications": state.get("notifications", []) + [{
+#                 "type": "error",
+#                 "message": f"Could not find location: {destination_query}",
+#                 "timestamp": datetime.now()
+#             }]
+#         }
     
-    # Calculate route
-    if not state.get("current_location"):
-        return {
-            **state,
-            "notifications": state.get("notifications", []) + [{
-                "type": "error",
-                "message": "Current location unknown. Please enable location services.",
-                "timestamp": datetime.now()
-            }]
-        }
+#     # Calculate route
+#     if not state.get("current_location"):
+#         return {
+#             **state,
+#             "notifications": state.get("notifications", []) + [{
+#                 "type": "error",
+#                 "message": "Current location unknown. Please enable location services.",
+#                 "timestamp": datetime.now()
+#             }]
+#         }
     
-    route = navigation_tool.calculate_route(
-        state["current_location"],
-        destination
-    )
+#     route = navigation_tool.calculate_route(
+#         state["current_location"],
+#         destination
+#     )
     
-    # Generate conversational directions
-    llm = get_llm()
-    directions_prompt = f"""
-    Convert these navigation steps into friendly, conversational directions.
+#     # Generate conversational directions
+#     llm = get_llm()
+#     directions_prompt = f"""
+#     Convert these navigation steps into friendly, conversational directions.
     
-    Steps:
-    {[step['instruction'] for step in route['steps']]}
+#     Steps:
+#     {[step['instruction'] for step in route['steps']]}
     
-    Estimated time: {route['estimated_time']} seconds
+#     Estimated time: {route['estimated_time']} seconds
     
-    Make it sound natural and helpful, like a friend giving directions.
-    Keep it concise (3-4 sentences max).
-    """
+#     Make it sound natural and helpful, like a friend giving directions.
+#     Keep it concise (3-4 sentences max).
+#     """
     
-    try:
-        directions_response = llm.invoke(directions_prompt)
-        conversational_directions = directions_response.content
-    except Exception as e:
-        logger.error(f"Error generating directions: {e}")
-        conversational_directions = f"Navigate to {destination['name']}. It will take about {route['estimated_time'] // 60} minutes."
+#     try:
+#         directions_response = llm.invoke(directions_prompt)
+#         conversational_directions = directions_response.content
+#     except Exception as e:
+#         logger.error(f"Error generating directions: {e}")
+#         conversational_directions = f"Navigate to {destination['name']}. It will take about {route['estimated_time'] // 60} minutes."
     
-    return {
-        **state,
-        "destination": destination,
-        "navigation_route": route["steps"],
-        "navigation_active": True,
-        "notifications": state.get("notifications", []) + [{
-            "type": "navigation",
-            "title": f"Directions to {destination['name']}",
-            "message": conversational_directions,
-            "route": route,
-            "timestamp": datetime.now()
-        }],
-        "last_updated": datetime.now()
-    }
+#     return {
+#         **state,
+#         "destination": destination,
+#         "navigation_route": route["steps"],
+#         "navigation_active": True,
+#         "notifications": state.get("notifications", []) + [{
+#             "type": "navigation",
+#             "title": f"Directions to {destination['name']}",
+#             "message": conversational_directions,
+#             "route": route,
+#             "timestamp": datetime.now()
+#         }],
+#         "last_updated": datetime.now()
+#     }
 
 
 def find_nearby_amenities(state: HospitalGuidanceState) -> Dict[str, Any]:
@@ -346,7 +346,7 @@ Format as plain text with natural paragraphs (no markdown headers, no bullet poi
     }
 
 
-def extract_destination_with_llm(message: str, llm) -> str:
+def extract_destination_with_llm(message: str) -> str:
     """Use LLM to reliably extract destination"""
     
     from langchain_core.prompts import ChatPromptTemplate
@@ -367,6 +367,7 @@ Query: {message}
 Location (one or two words only):""")
     
     try:
+        llm = get_llm()
         destination = (
             prompt 
             | llm 
