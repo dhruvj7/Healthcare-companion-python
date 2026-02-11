@@ -1,25 +1,19 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from app.core.config import settings
-import logging
-
-logger = logging.getLogger(__name__)
-
-
+from langchain_core.runnables import Runnable
 from langchain_google_genai import ChatGoogleGenerativeAI
 from google.api_core.exceptions import ResourceExhausted
 from app.core.config import settings
-import logging
 import asyncio
+import logging
 
 logger = logging.getLogger(__name__)
 
 
-class FallbackGeminiLLM:
+class FallbackGeminiLLM(Runnable):
     """
     Gemini LLM wrapper with:
     - Model fallback
-    - Fast quota detection
-    - Timeout control
+    - Async-safe execution
+    - LangGraph compatible
     """
 
     def __init__(self):
@@ -85,11 +79,9 @@ class FallbackGeminiLLM:
                     model=model_name,
                     temperature=settings.LLM_TEMPERATURE,
                     google_api_key=settings.GOOGLE_API_KEY,
-                    max_output_tokens=settings.LLM_MAX_TOKENS,
-                    timeout=timeout,  # critical
+                    max_output_tokens=settings.LLM_MAX_TOKENS
                 )
 
-                # Hard timeout wrapper
                 response = asyncio.run(
                     asyncio.wait_for(
                         self._async_invoke(llm, prompt),
@@ -102,39 +94,37 @@ class FallbackGeminiLLM:
                     return response
 
             except ResourceExhausted as e:
-                logger.warning(
-                    f"Quota exhausted for model [{model_name}]"
-                )
+                logger.warning(f"Quota exhausted for model [{model_name}]")
                 last_error = e
                 continue
 
-            except asyncio.TimeoutError:
-                logger.warning(
-                    f"Timeout for model [{model_name}]"
-                )
-                last_error = TimeoutError("LLM timeout")
-                continue
-
             except Exception as e:
-                logger.warning(
-                    f"Gemini model failed [{model_name}]: {e}"
-                )
+                logger.warning(f"Gemini model failed [{model_name}]: {e}")
                 last_error = e
                 continue
 
         logger.error("All Gemini models exhausted")
         raise last_error or RuntimeError("All LLM models failed")
 
-    async def _async_invoke(self, llm, prompt):
-        return await llm.ainvoke(prompt)
-
+    # --------------------------------------------------
+    # 🔥 SYNC (Required by Runnable interface)
+    # --------------------------------------------------
+    def invoke(self, prompt, config=None):
+        """
+        Safe sync wrapper.
+        DO NOT use asyncio.run() inside event loop.
+        """
+        try:
+            asyncio.get_running_loop()
+            raise RuntimeError(
+                "Cannot use sync invoke() inside running event loop. "
+                "Use await llm.ainvoke(...) instead."
+            )
+        except RuntimeError:
+            return asyncio.run(self.ainvoke(prompt, config=config))
 
 
 def get_llm():
-    """
-    Returns a Gemini LLM with automatic fallback.
-    Call site remains unchanged.
-    """
     if not settings.ENABLE_LLM:
         raise RuntimeError("LLM disabled via config")
 
