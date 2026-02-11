@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
+from app.agents.appointment_scheduler.node import appointment_booking_node
 from app.services.intent_classifier import (
     classify_intents,
     IntentType,
@@ -13,6 +14,7 @@ from app.agents.symptom_analysis.agent import symptom_agent
 from app.agents.doctor_finder.agent import doctor_agent
 from app.services.llm_service import get_llm
 from app.services.insurance_verifier import verify_insurance
+from app.agents.appointment_scheduler.crud import get_available_slots, book_appointment
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +33,24 @@ class HealthcareOrchestrator:
         self,
         user_input: str,
         session_id: Optional[str] = None,
-        additional_context: Optional[Dict[str, Any]] = None
+        additional_context: Optional[Dict[str, Any]] = None,
+        booking_slot_id:Optional[int] = None
     ) -> Dict[str, Any]:
+        """
+        Main entry point for processing user requests.
 
+        Args:
+            user_input: The user's message/prompt
+            session_id: Optional session ID for conversation continuity
+            additional_context: Optional additional context (user profile, location, etc.)
+            booking_slot_id: Optional booking slot ID for appointment booking
+
+        Returns:
+            Unified response with results from appropriate agent
+        """
+        logger.info(f"Processing request: '{user_input[:100]}...'")
+
+        # Generate or use existing session ID
         if not session_id:
             session_id = f"session_{uuid.uuid4().hex[:12]}"
 
@@ -45,11 +62,12 @@ class HealthcareOrchestrator:
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
-        classification: MultiIntentClassificationResult = classify_intents(
+        classification = classify_intents(
             user_input=user_input,
             conversation_history=conversation_history
         )
 
+        
         logger.info(f"Detected intents: {[i.value for i in classification.intents]}")
 
         results: List[Dict[str, Any]] = []
@@ -67,8 +85,9 @@ class HealthcareOrchestrator:
                 result = await self._execute_intent(
                     intent=intent,
                     user_input=user_input,
-                    entities=classification.extracted_entities,
-                    session_id=session_id
+                    extracted_entities=classification.extracted_entities,
+                    session_id=session_id,
+                    booking_slot_id=booking_slot_id
                 )
                 result["intent"] = intent.value
                 results.append(result)
@@ -101,33 +120,34 @@ class HealthcareOrchestrator:
         self,
         intent: IntentType,
         user_input: str,
-        entities: Dict[str, Any],
-        session_id: str
+        extracted_entities: Dict[str, Any],
+        session_id: str,
+        booking_slot_id: Optional[int]
     ) -> Dict[str, Any]:
 
         if intent == IntentType.SYMPTOM_ANALYSIS:
             return await self._handle_symptom_analysis(
-                user_input, entities, session_id
+                user_input, extracted_entities, session_id
             )
 
         elif intent == IntentType.INSURANCE_VERIFICATION:
             return self._handle_insurance_verification(
-                user_input, entities, session_id
+                user_input, extracted_entities, session_id
             )
 
         elif intent == IntentType.APPOINTMENT_BOOKING:
-            return self._handle_appointment_booking(
-                user_input, entities, session_id
+            return await self._handle_appointment_booking(
+                user_input, slot_id=booking_slot_id, entities=extracted_entities, session_id=session_id
             )
 
         elif intent == IntentType.HOSPITAL_NAVIGATION:
             return self._handle_hospital_navigation(
-                user_input, entities, session_id
+                user_input, extracted_entities, session_id
             )
 
         elif intent == IntentType.GENERAL_HEALTH_QUESTION:
             return self._handle_general_question(
-                user_input, entities
+                user_input, extracted_entities
             )
 
         else:
@@ -227,7 +247,7 @@ class HealthcareOrchestrator:
 
         # Also run doctor matching
         result_state = await doctor_agent.ainvoke(result_state)
-
+    
         # Format response
         response = {
             "status": "success",
@@ -251,7 +271,8 @@ class HealthcareOrchestrator:
             },
             "care_options": {
                 "suggested_specialties": result_state.get("suggested_specialties"),
-                "matched_doctors": result_state.get("matched_doctors", [])
+                "matched_doctors": result_state.get("matched_doctors", []),
+                "available_slots": result_state.get("available_appointments", {})
             },
             "next_steps": self._get_next_steps(result_state)
         }
@@ -323,42 +344,102 @@ class HealthcareOrchestrator:
                 "error": str(e)
             }
 
-    def _handle_appointment_booking(self, user_input: str, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+    async def _handle_appointment_booking(self, user_input: str, slot_id: int, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
         """Handle appointment booking requests"""
         logger.info("Handling appointment booking request")
+        logger.info(f"Entities received: {entities}")
 
+        # Extract booking-related entities
+        slot_id = slot_id
+        patient_name = entities.get("patient_name")
+        patient_email = entities.get("patient_email")
+        patient_phone = entities.get("patient_phone")
+        reason_for_visit = entities.get("reason_for_visit") or entities.get("reason", user_input)
+        appointment_type = entities.get("appointment_type", "in-person")
+
+        logger.info("entities extracted for booking")
+
+        # Check if we have all required information to proceed with booking
+        if all([slot_id, patient_name, patient_email, patient_phone]):
+            logger.info(f"All booking fields present - proceeding with appointment booking for slot {slot_id}")
+
+            # Build state for booking node
+            booking_state = {
+                "slot_id": slot_id,
+                "patient_name": patient_name,
+                "patient_email": patient_email,
+                "patient_phone": patient_phone,
+                "reason_for_visit": reason_for_visit,
+                "appointment_type": appointment_type,
+                "session_id": session_id
+            }
+
+            logger.info("Booking state constructed")
+
+            # Call appointment booking node
+            result_state = await appointment_booking_node(booking_state)
+
+            # Format response based on booking status
+            if result_state.get("booking_status") == "confirmed":
+                return {
+                    "status": "success",
+                    "message": result_state.get("confirmation_message"),
+                    "booking_details": result_state.get("appointment_details"),
+                    "booking_id": result_state.get("booking_id"),
+                    "emails_sent": result_state.get("emails_sent", False)
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": result_state.get("confirmation_message"),
+                    "error": result_state.get("error"),
+                    "next_steps": [
+                        "Please verify the slot is still available",
+                        "Check that all information is correct",
+                        "Try selecting a different time slot if needed"
+                    ]
+                }
+
+        # If missing required fields, provide guidance
         specialty = entities.get("specialty")
         preferred_date = entities.get("preferred_date")
         doctor_name = entities.get("doctor_name")
-        reason = entities.get("reason", user_input)
 
-        # For now, provide guidance on booking
-        # In a full implementation, this would integrate with the appointment scheduler
+        required_fields = []
+        if not slot_id:
+            required_fields.append("slot_id")
+        if not patient_name:
+            required_fields.append("patient_name")
+        if not patient_email:
+            required_fields.append("patient_email")
+        if not patient_phone:
+            required_fields.append("patient_phone")
+
         return {
-            "status": "guidance",
-            "message": "I can help you book an appointment! Here's what we need:",
+            "status": "needs_more_info",
+            "message": "I can help you book an appointment! Let me gather the necessary information.",
+            "required_fields": required_fields,
             "booking_flow": {
                 "step": "information_gathering",
                 "collected": {
+                    "slot_id": slot_id,
+                    "patient_name": patient_name,
+                    "patient_email": patient_email,
+                    "patient_phone": patient_phone,
                     "specialty": specialty,
                     "preferred_date": preferred_date,
                     "doctor_name": doctor_name,
-                    "reason": reason
+                    "reason": reason_for_visit
                 },
                 "next_questions": self._generate_booking_questions(entities)
-            },
-            "available_endpoints": {
-                "list_doctors": "/api/v1/appointment-scheduler/doctors",
-                "available_slots": "/api/v1/appointment-scheduler/slots",
-                "book_appointment": "/api/v1/appointment-scheduler/book"
             },
             "instructions": [
                 "1. Choose your preferred specialty or doctor",
                 "2. View available time slots",
-                "3. Select a slot and provide patient details",
+                "3. Provide your personal details (name, email, phone)",
                 "4. Confirm your appointment"
             ]
-        }
+        }        
 
     def _handle_hospital_navigation(self, user_input: str, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
         """Handle hospital navigation requests"""
@@ -475,7 +556,8 @@ Respond in a conversational tone.
         next_steps.append("Monitor your symptoms and track any changes")
 
         if state.get("requires_doctor"):
-            next_steps.append("Schedule a doctor's appointment soon")
+            next_steps.append("Schedule a doctor's appointment soon.")
+            next_steps.append("To book an appointment, choose the preferred slot, mention your name, email, phone and appointment type.")
 
         return next_steps
 
