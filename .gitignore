@@ -9,10 +9,22 @@ venv/
 *.egg-info/
 .python-version
 pyproject.toml
-# Angular dependencies
-frontend\angular\.angular
-frontend\angular\node_modules\*
-/frontend/angular - Copy
+# 🅰️ Angular / Frontend
+####################################
+# Node dependencies
+frontend/angular/node_modules/
+
+# Angular build output
+frontend/angular/dist/
+frontend/angular/.angular/
+
+# Angular cache / temp
+frontend/angular/.cache/
+frontend/angular/.vite/
+
+# Compiled JS chunks (extra safety)
+frontend/angular/**/*.js
+frontend/angular/**/*.js.map
 #gitignore file
 .gitignore
 
