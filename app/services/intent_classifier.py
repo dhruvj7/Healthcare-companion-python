@@ -144,6 +144,44 @@ Format:
 # FALLBACK CLASSIFIER (SAFE RULE-BASED)
 # ---------------------------------------------------------
 
+# def _fallback_classification(user_input: str) -> MultiIntentClassificationResult:
+
+#     input_lower = user_input.lower()
+
+#     emergency_keywords = [
+#         "chest pain", "can't breathe", "unconscious",
+#         "bleeding heavily", "heart attack", "stroke"
+#     ]
+
+#     if any(k in input_lower for k in emergency_keywords):
+#         return MultiIntentClassificationResult(
+#             intents=[IntentType.EMERGENCY],
+#             execution_order=[IntentType.EMERGENCY],
+#             confidence=0.9,
+#             reasoning="Emergency keywords detected",
+#             extracted_entities={"symptoms": [user_input]},
+#             requires_sequential_execution=True,
+#         )
+
+#     intents = []
+
+#     if any(k in input_lower for k in ["pain", "fever", "cough", "headache"]):
+#         intents.append(IntentType.SYMPTOM_ANALYSIS)
+
+#     if any(k in input_lower for k in ["book", "appointment", "schedule"]):
+#         intents.append(IntentType.APPOINTMENT_BOOKING)
+
+#     if not intents:
+#         intents = [IntentType.GENERAL_HEALTH_QUESTION]
+
+#     return MultiIntentClassificationResult(
+#         intents=intents,
+#         execution_order=intents,
+#         confidence=0.6,
+#         reasoning="Fallback classification",
+#         extracted_entities={},
+#         requires_sequential_execution=True,
+#     )
 def _fallback_classification(user_input: str) -> MultiIntentClassificationResult:
 
     input_lower = user_input.lower()
@@ -165,20 +203,42 @@ def _fallback_classification(user_input: str) -> MultiIntentClassificationResult
 
     intents = []
 
+    # -----------------------------------
+    # 🏥 Hospital Navigation Detection
+    # -----------------------------------
+    navigation_keywords = [
+        "navigate", "directions", "where is", "how do i get to",
+        "route to", "find the", "locate", "cafeteria",
+        "pharmacy", "icu", "ward", "reception", "billing",
+        "lab", "laboratory", "radiology", "emergency room"
+    ]
+
+    if any(k in input_lower for k in navigation_keywords):
+        intents.append(IntentType.HOSPITAL_NAVIGATION)
+    logger.info("the intent inside the fall back is ", intents)  
+    # -----------------------------------
+    # 🤒 Symptom Analysis
+    # -----------------------------------
     if any(k in input_lower for k in ["pain", "fever", "cough", "headache"]):
         intents.append(IntentType.SYMPTOM_ANALYSIS)
 
+    # -----------------------------------
+    # 📅 Appointment Booking
+    # -----------------------------------
     if any(k in input_lower for k in ["book", "appointment", "schedule"]):
         intents.append(IntentType.APPOINTMENT_BOOKING)
 
+    # -----------------------------------
+    # Default
+    # -----------------------------------
     if not intents:
         intents = [IntentType.GENERAL_HEALTH_QUESTION]
 
     return MultiIntentClassificationResult(
         intents=intents,
         execution_order=intents,
-        confidence=0.6,
-        reasoning="Fallback classification",
+        confidence=0.7,
+        reasoning="Fallback rule-based classification",
         extracted_entities={},
         requires_sequential_execution=True,
     )

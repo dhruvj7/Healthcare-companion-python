@@ -94,7 +94,7 @@ async def unified_chat(request: ChatRequest):
         # If new multi-intent response
         if "intents" in result:
             intents = result.get("intents", [])
-            primary_intent = intents[0] if intents else "unknown"
+            # primary_intent = intents[0] if intents else "unknown"
 
             requires_more_info = False
             follow_up_questions = []

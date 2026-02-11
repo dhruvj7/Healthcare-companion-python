@@ -102,54 +102,93 @@ class HealthcareOrchestrator:
     # 🔥 INTENT EXECUTOR
     # =====================================================
 
-    async def _execute_intent(
-        self,
-        intent: IntentType,
-        user_input: str,
-        entities: Dict[str, Any],
-        session_id: str,
-        additional_context : str
-    ) -> Dict[str, Any]:
+    # async def _execute_intent(
+    #     self,
+    #     intent: IntentType,
+    #     user_input: str,
+    #     entities: Dict[str, Any],
+    #     session_id: str,
+    #     additional_context : str
+    # ) -> Dict[str, Any]:
 
-        if intent == IntentType.SYMPTOM_ANALYSIS:
-            return await self._handle_symptom_analysis(
-                user_input, entities, session_id
-            )
+    #     if intent == IntentType.SYMPTOM_ANALYSIS:
+    #         return await self._handle_symptom_analysis(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.INSURANCE_VERIFICATION:
-            return self._handle_insurance_verification(
-                user_input, entities, session_id
-            )
+    #     elif intent == IntentType.INSURANCE_VERIFICATION:
+    #         return self._handle_insurance_verification(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.APPOINTMENT_BOOKING:
-            return self._handle_appointment_booking(
-                user_input, entities, session_id
-            )
+    #     elif intent == IntentType.APPOINTMENT_BOOKING:
+    #         return self._handle_appointment_booking(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.HOSPITAL_NAVIGATION:
-            return self._handle_hospital_navigation(
-                user_input, entities, session_id
-            )
+    #     elif intent == IntentType.HOSPITAL_NAVIGATION:
+    #         return self._handle_hospital_navigation(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.GENERAL_HEALTH_QUESTION:
-            return self._handle_general_question(
-                user_input, entities
-            )
+    #     elif intent == IntentType.GENERAL_HEALTH_QUESTION:
+    #         return self._handle_general_question(
+    #             user_input, entities
+    #         )
         
-        elif intent == IntentType.HOSPITAL_NAVIGATION:
-                return await self._handle_hospital_navigation(
-                user_input, 
-                entities, 
-                session_id,
-                additional_context
-            )
+    #     elif intent == IntentType.HOSPITAL_NAVIGATION:
+    #             return await self._handle_hospital_navigation(
+    #             user_input, 
+    #             entities, 
+    #             session_id,
+    #             additional_context
+    #         )
 
-        else:
-            return self._handle_unknown_intent(user_input)
+    #     else:
+    #         return self._handle_unknown_intent(user_input)
 
     # =====================================================
     # 🔥 MERGE MULTIPLE RESULTS
     # =====================================================
+    async def _execute_intent(
+    self,
+    intent: IntentType,
+    user_input: str,
+    entities: Dict[str, Any],
+    session_id: str,
+    additional_context: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+
+     if intent == IntentType.SYMPTOM_ANALYSIS:
+        return await self._handle_symptom_analysis(
+            user_input, entities, session_id
+        )
+
+     elif intent == IntentType.INSURANCE_VERIFICATION:
+        return self._handle_insurance_verification(
+            user_input, entities, session_id
+        )
+
+     elif intent == IntentType.APPOINTMENT_BOOKING:
+        return self._handle_appointment_booking(
+            user_input, entities, session_id
+        )
+
+     elif intent == IntentType.HOSPITAL_NAVIGATION:
+        return await self._handle_hospital_navigation(
+            user_input,
+            entities,
+            session_id,
+            additional_context
+        )
+
+     elif intent == IntentType.GENERAL_HEALTH_QUESTION:
+        return await self._handle_general_question(
+            user_input, entities
+        )
+
+     else:
+        return self._handle_unknown_intent(user_input)
 
     def _merge_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -560,7 +599,7 @@ class HealthcareOrchestrator:
                 },
                 "notifications": result_state.get("notifications", [])
             }
-            
+            logger.info("response of hospital guidance agent: %s", response)
             return response
             
         except Exception as e:
