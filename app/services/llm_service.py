@@ -28,7 +28,53 @@ class FallbackGeminiLLM:
             *settings.FALLBACK_LLM_MODELS
         ]
 
-    def invoke(self, prompt: str, timeout: int = 8):
+    async def _async_invoke(self, llm, prompt: str):
+        """Async wrapper for LLM invocation"""
+        try:
+            # Use ainvoke for async operation
+            response = await llm.ainvoke(prompt)
+            return response
+        except Exception as e:
+            raise e
+    
+    async def ainvoke(self, prompt: str, timeout: int = 10):
+        """Async invoke with fallback"""
+        last_error = None
+        
+        for model_name in self.models:
+            try:
+                logger.info(f"Trying Gemini model: {model_name}")
+                
+                llm = ChatGoogleGenerativeAI(
+                    model=model_name,
+                    temperature=settings.LLM_TEMPERATURE,
+                    google_api_key=settings.GOOGLE_API_KEY,
+                    max_output_tokens=settings.LLM_MAX_TOKENS,
+                    timeout=timeout,  # critical
+                )
+                
+                response = await asyncio.wait_for(
+                    self._async_invoke(llm, prompt),
+                    timeout=timeout,
+                )
+                
+                logger.info(f"Gemini success with model: {model_name}")
+                return response
+                
+            except asyncio.TimeoutError:
+                logger.warning(f"Gemini model timed out [{model_name}]")
+                last_error = TimeoutError(f"Model {model_name} timed out")
+                continue
+                
+            except Exception as e:
+                logger.warning(f"Gemini model failed [{model_name}]: {e}")
+                last_error = e
+                continue
+        
+        logger.error("All Gemini models exhausted")
+        raise last_error or RuntimeError("All LLM models failed")
+    
+    def invoke(self, prompt: str, timeout: int = 10):
         last_error = None
 
         for model_name in self.models:

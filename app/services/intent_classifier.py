@@ -57,7 +57,7 @@ class MultiIntentClassificationResult:
 # MAIN MULTI INTENT CLASSIFIER
 # ---------------------------------------------------------
 
-def classify_intents(
+async def classify_intents(
     user_input: str,
     conversation_history: Optional[list] = None
 ) -> MultiIntentClassificationResult:
@@ -81,6 +81,14 @@ User Input:
 
 {context_str}
 
+There are following possible intents:
+- symptom_analysis
+- insurance_verification
+- appointment_booking
+- hospital_navigation
+- general_health_question
+- emergency
+
 Respond ONLY with valid JSON in this format:
 {{
   "intents": ["symptom_analysis"],
@@ -93,7 +101,7 @@ Respond ONLY with valid JSON in this format:
 """
 
     try:
-        response = llm.invoke(prompt)
+        response = await llm.ainvoke(prompt)
         content = response.content.strip()
         content = re.sub(r'^```json\s*|\s*```$', '', content, flags=re.MULTILINE)
         data = json.loads(content)
