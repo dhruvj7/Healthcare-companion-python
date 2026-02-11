@@ -127,7 +127,7 @@ async def unified_chat(request: ChatRequest):
                 session_id=result["session_id"],
                 timestamp=result["timestamp"],
                 user_input=result["user_input"],
-                intent=primary_intent,
+                intent=intents,
                 confidence=result.get("confidence", 0.8),
                 reasoning=result.get("reasoning", ""),
                 requires_more_info=result.get("requires_more_info", False),

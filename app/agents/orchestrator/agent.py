@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 from app.agents.hospital_guidance.state import JourneyStage
-from app.services.intent_classifier import classify_intent, IntentType
+from app.services.intent_classifier import classify_intents, IntentType
 from app.services.intent_classifier import (
     classify_intents,
     IntentType,
@@ -72,7 +72,8 @@ class HealthcareOrchestrator:
                     intent=intent,
                     user_input=user_input,
                     entities=classification.extracted_entities,
-                    session_id=session_id
+                    session_id=session_id,
+                    additional_context=additional_context
                 )
                 result["intent"] = intent.value
                 results.append(result)
@@ -106,7 +107,8 @@ class HealthcareOrchestrator:
         intent: IntentType,
         user_input: str,
         entities: Dict[str, Any],
-        session_id: str
+        session_id: str,
+        additional_context : str
     ) -> Dict[str, Any]:
 
         if intent == IntentType.SYMPTOM_ANALYSIS:
@@ -137,7 +139,7 @@ class HealthcareOrchestrator:
         elif intent == IntentType.HOSPITAL_NAVIGATION:
                 return await self._handle_hospital_navigation(
                 user_input, 
-                extracted_entities, 
+                entities, 
                 session_id,
                 additional_context
             )
@@ -677,7 +679,7 @@ class HealthcareOrchestrator:
             "help_text": "Please ask a staff member for detailed directions, or I can help you find another location."
         }
 
-    def _handle_general_question(self, user_input: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+    async  def _handle_general_question(self, user_input: str, entities: Dict[str, Any]) -> Dict[str, Any]:
         """Handle general health questions using LLM"""
         logger.info("Handling general health question")
 
@@ -697,7 +699,8 @@ Respond in a conversational tone.
 """
 
         try:
-            response = self.llm.invoke(prompt)
+            response = await self.llm.ainvoke(prompt)
+
             answer = response.content
 
             return {
