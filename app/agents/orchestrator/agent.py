@@ -1,17 +1,14 @@
-# app/agents/orchestrator/agent.py
-
-"""
-Unified Orchestrator Agent
-
-Routes user requests to appropriate specialized agents based on intent classification.
-"""
-
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
-from app.services.intent_classifier import classify_intent, IntentType
+from app.services.intent_classifier import (
+    classify_intents,
+    IntentType,
+    MultiIntentClassificationResult,
+)
+
 from app.agents.symptom_analysis.agent import symptom_agent
 from app.agents.doctor_finder.agent import doctor_agent
 from app.services.llm_service import get_llm
@@ -21,13 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 class HealthcareOrchestrator:
-    """
-    Main orchestrator that handles all user requests and routes to appropriate agents.
-    """
 
     def __init__(self):
         self.llm = get_llm()
         self.conversation_sessions: Dict[str, List[Dict[str, Any]]] = {}
+
+    # =====================================================
+    # 🔥 MAIN ENTRY (MULTI-INTENT ENABLED)
+    # =====================================================
 
     async def process_request(
         self,
@@ -35,127 +33,140 @@ class HealthcareOrchestrator:
         session_id: Optional[str] = None,
         additional_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Main entry point for processing user requests.
 
-        Args:
-            user_input: The user's message/prompt
-            session_id: Optional session ID for conversation continuity
-            additional_context: Optional additional context (user profile, location, etc.)
-
-        Returns:
-            Unified response with results from appropriate agent
-        """
-        logger.info(f"Processing request: '{user_input[:100]}...'")
-
-        # Generate or use existing session ID
         if not session_id:
             session_id = f"session_{uuid.uuid4().hex[:12]}"
-            logger.info(f"Created new session: {session_id}")
 
-        # Get conversation history
         conversation_history = self.conversation_sessions.get(session_id, [])
 
-        # Step 1: Classify Intent
-        classification = classify_intent(user_input, conversation_history)
-
-        logger.info(f"Intent: {classification.intent.value} (confidence: {classification.confidence})")
-
-        # Store user message in history
         conversation_history.append({
             "role": "user",
             "content": user_input,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
-        # Step 2: Route to Appropriate Agent
-        result = await self._route_to_agent(
-            intent=classification.intent,
+        classification: MultiIntentClassificationResult = classify_intents(
             user_input=user_input,
-            extracted_entities=classification.extracted_entities,
-            session_id=session_id,
-            additional_context=additional_context or {}
+            conversation_history=conversation_history
         )
 
-        # Step 3: Build Unified Response
-        response = {
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat(),
-            "user_input": user_input,
-            "intent": classification.intent.value,
-            "confidence": classification.confidence,
-            "reasoning": classification.reasoning,
-            "requires_more_info": classification.requires_more_info,
-            "follow_up_questions": classification.follow_up_questions,
-            "result": result
-        }
+        logger.info(f"Detected intents: {[i.value for i in classification.intents]}")
 
-        # Store assistant response in history
+        results: List[Dict[str, Any]] = []
+
+        # 🚨 Emergency override
+        if IntentType.EMERGENCY in classification.intents:
+            result = self._handle_emergency(
+                user_input,
+                classification.extracted_entities
+            )
+            result["intent"] = IntentType.EMERGENCY.value
+            results.append(result)
+        else:
+            for intent in classification.execution_order:
+                result = await self._execute_intent(
+                    intent=intent,
+                    user_input=user_input,
+                    entities=classification.extracted_entities,
+                    session_id=session_id
+                )
+                result["intent"] = intent.value
+                results.append(result)
+
+        final_result = self._merge_results(results)
+
         conversation_history.append({
             "role": "assistant",
-            "content": result.get("message", ""),
-            "intent": classification.intent.value,
-            "timestamp": datetime.now().isoformat()
+            "content": final_result.get("message", ""),
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
-        # Update conversation history (keep last 20 messages)
         self.conversation_sessions[session_id] = conversation_history[-20:]
 
-        return response
+        return {
+            "session_id": session_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "user_input": user_input,
+            "intents": [i.value for i in classification.intents],
+            "confidence": classification.confidence,
+            "reasoning": classification.reasoning,
+            "result": final_result
+        }
 
-    async def _route_to_agent(
+    # =====================================================
+    # 🔥 INTENT EXECUTOR
+    # =====================================================
+
+    async def _execute_intent(
         self,
         intent: IntentType,
         user_input: str,
-        extracted_entities: Dict[str, Any],
-        session_id: str,
-        additional_context: Dict[str, Any]
+        entities: Dict[str, Any],
+        session_id: str
     ) -> Dict[str, Any]:
-        """
-        Route request to the appropriate specialized agent.
 
-        Args:
-            intent: Classified intent
-            user_input: Original user input
-            extracted_entities: Extracted information from user input
-            session_id: Session identifier
-            additional_context: Additional context
+        if intent == IntentType.SYMPTOM_ANALYSIS:
+            return await self._handle_symptom_analysis(
+                user_input, entities, session_id
+            )
 
-        Returns:
-            Agent-specific response
-        """
-        logger.info(f"Routing to agent for intent: {intent.value}")
+        elif intent == IntentType.INSURANCE_VERIFICATION:
+            return self._handle_insurance_verification(
+                user_input, entities, session_id
+            )
 
-        try:
-            if intent == IntentType.EMERGENCY:
-                return self._handle_emergency(user_input, extracted_entities)
+        elif intent == IntentType.APPOINTMENT_BOOKING:
+            return self._handle_appointment_booking(
+                user_input, entities, session_id
+            )
 
-            elif intent == IntentType.SYMPTOM_ANALYSIS:
-                return await self._handle_symptom_analysis(user_input, extracted_entities, session_id)
+        elif intent == IntentType.HOSPITAL_NAVIGATION:
+            return self._handle_hospital_navigation(
+                user_input, entities, session_id
+            )
 
-            elif intent == IntentType.INSURANCE_VERIFICATION:
-                return self._handle_insurance_verification(user_input, extracted_entities, session_id)
+        elif intent == IntentType.GENERAL_HEALTH_QUESTION:
+            return self._handle_general_question(
+                user_input, entities
+            )
 
-            elif intent == IntentType.APPOINTMENT_BOOKING:
-                return self._handle_appointment_booking(user_input, extracted_entities, session_id)
+        else:
+            return self._handle_unknown_intent(user_input)
 
-            elif intent == IntentType.HOSPITAL_NAVIGATION:
-                return self._handle_hospital_navigation(user_input, extracted_entities, session_id)
+    # =====================================================
+    # 🔥 MERGE MULTIPLE RESULTS
+    # =====================================================
 
-            elif intent == IntentType.GENERAL_HEALTH_QUESTION:
-                return self._handle_general_question(user_input, extracted_entities)
+    def _merge_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
-            else:
-                return self._handle_unknown_intent(user_input)
+        if len(results) == 1:
+            return results[0]
 
-        except Exception as e:
-            logger.error(f"Error routing to agent: {e}", exc_info=True)
-            return {
-                "status": "error",
-                "message": "An error occurred while processing your request. Please try again.",
-                "error": str(e)
+        combined_message = "\n\n".join(
+            r.get("message", "") for r in results if r.get("message")
+        )
+
+        # Priority resolution
+        priority_order = [
+            "emergency",
+            "error",
+            "verification_failed",
+            "needs_more_info"
+        ]
+
+        overall_status = "multi_intent_success"
+
+        for status in priority_order:
+            if any(r.get("status") == status for r in results):
+                overall_status = status
+                break
+
+        return {
+            "status": overall_status,
+            "message": combined_message,
+            "sub_results": results
             }
-
+    
     def _handle_emergency(self, user_input: str, entities: Dict[str, Any]) -> Dict[str, Any]:
         """Handle emergency situations"""
         logger.critical(f"EMERGENCY detected: {user_input}")
@@ -500,6 +511,9 @@ Respond in a conversational tone.
             questions.append("What is the reason for your visit?")
 
         return questions
+
+        
+
 
 
 # Global orchestrator instance

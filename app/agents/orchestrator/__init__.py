@@ -2,4 +2,4 @@
 
 from app.agents.orchestrator.agent import orchestrator, HealthcareOrchestrator
 
-__all__ = ["orchestrator", "HealthcareOrchestrator"]
+__all__ = ["orchestrator", "HealthcareOrchestrator", "get_orchestrator"]

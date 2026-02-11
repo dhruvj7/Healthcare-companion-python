@@ -38,7 +38,8 @@ class ChatResponse(BaseModel):
     session_id: str = Field(..., description="Session identifier")
     timestamp: str = Field(..., description="Response timestamp")
     user_input: str = Field(..., description="Original user input")
-    intent: str = Field(..., description="Detected intent")
+    intent: List[str]=Field(...,description="intent")
+
     confidence: float = Field(..., description="Intent classification confidence (0-1)")
     reasoning: str = Field(..., description="Why this intent was chosen")
     requires_more_info: bool = Field(..., description="Whether more information is needed")
@@ -74,17 +75,69 @@ class ConversationHistoryResponse(BaseModel):
 
 # ===== ENDPOINTS =====
 
+
 @router.post("/chat", response_model=ChatResponse, status_code=status.HTTP_200_OK)
 async def unified_chat(request: ChatRequest):
     try:
         logger.info(f"Received chat request: '{request.message[:100]}...'")
 
-        # Process request through orchestrator
         result = await orchestrator.process_request(
             user_input=request.message,
             session_id=request.session_id,
             additional_context=request.context
         )
+
+        # ================================
+        # ✅ MULTI-INTENT HANDLING LOGIC
+        # ================================
+
+        # If new multi-intent response
+        if "intents" in result:
+            intents = result.get("intents", [])
+            primary_intent = intents[0] if intents else "unknown"
+
+            requires_more_info = False
+            follow_up_questions = []
+
+            # If multi-intent result
+            if result.get("result", {}).get("status") == "multi_intent_success":
+                sub_results = result["result"].get("sub_results", [])
+
+                # Merge sub results cleanly
+                merged_result = {
+                    "status": "multi_intent_success",
+                    "message": result["result"].get("message"),
+                    "sub_results": sub_results
+                }
+
+                return ChatResponse(
+                    session_id=result["session_id"],
+                    timestamp=result["timestamp"],
+                    user_input=result["user_input"],
+                    intent=intents,
+                    confidence=result.get("confidence", 0.8),
+                    reasoning=result.get("reasoning", "Multi-intent classification"),
+                    requires_more_info=requires_more_info,
+                    follow_up_questions=follow_up_questions,
+                    result=merged_result
+                )
+
+            # Single intent but returned as list
+            return ChatResponse(
+                session_id=result["session_id"],
+                timestamp=result["timestamp"],
+                user_input=result["user_input"],
+                intent=primary_intent,
+                confidence=result.get("confidence", 0.8),
+                reasoning=result.get("reasoning", ""),
+                requires_more_info=result.get("requires_more_info", False),
+                follow_up_questions=result.get("follow_up_questions", []),
+                result=result.get("result", {})
+            )
+
+        # ================================
+        # ✅ BACKWARD COMPATIBILITY
+        # ================================
 
         logger.info(f"Request processed successfully. Intent: {result['intent']}")
 
