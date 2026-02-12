@@ -232,7 +232,7 @@ def update_location(state: HospitalGuidanceState, new_location: Dict[str, Any]) 
     return updated_state
 
 
-def provide_navigation(state: HospitalGuidanceState) -> Dict[str, Any]:
+async def provide_navigation(state: HospitalGuidanceState) -> Dict[str, Any]:
     """Provide navigation to a destination"""
     
     # Extract destination query from state (multiple sources)
@@ -325,7 +325,7 @@ Format as plain text with natural paragraphs (no markdown headers, no bullet poi
 """
     
     try:
-        directions_response = llm.invoke(directions_prompt)
+        directions_response = await llm.invoke(directions_prompt)
         conversational_directions = directions_response.content.strip()
     except Exception as e:
         logger.error(f"Error generating conversational directions: {e}")

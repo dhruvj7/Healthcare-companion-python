@@ -32,7 +32,7 @@ async def analyze_symptoms(request: SymptomRequest):
         }
 
         # STEP 1: Symptom analysis agent
-        state = symptom_agent.invoke(state)
+        state = await symptom_agent.invoke(state)
 
         # STEP 2: Doctor matching agent (ALWAYS)
         state = await doctor_agent.ainvoke(state)

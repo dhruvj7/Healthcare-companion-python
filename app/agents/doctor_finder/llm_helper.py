@@ -19,7 +19,7 @@ Rules:
 - Output STRICT JSON only
 """
 
-def llm_resolve_specialty(text: str) -> Optional[str]:
+async def llm_resolve_specialty(text: str) -> Optional[str]:
     """
     Uses LLM to infer a medical specialty from symptom or diagnosis text.
     Returns specialty string or None.
@@ -41,7 +41,7 @@ Respond ONLY with valid JSON:
 """
 
     try:
-        response = llm.invoke(prompt)
+        response = await llm.invoke(prompt)
         content = response.content.strip()
 
         content = re.sub(r'^```json\s*|\s*```$', '', content)

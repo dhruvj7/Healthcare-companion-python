@@ -79,7 +79,7 @@ def check_emergency_conditions(state: SymptomAnalysisState) -> Dict[str, Any]:
 
 
 
-def analyze_symptoms_with_llm(state: SymptomAnalysisState) -> Dict[str, Any]:
+async def analyze_symptoms_with_llm(state: SymptomAnalysisState) -> Dict[str, Any]:
     """Deep symptom analysis using Gemini AI"""
     
     # Skip if already classified as emergency
@@ -152,7 +152,7 @@ Respond ONLY with valid JSON. No markdown formatting, no explanation outside the
         logger.debug(f"Sending prompt to Gemini (length: {len(formatted_prompt)} chars)")
         
         # Call Gemini AI
-        response = llm.invoke(formatted_prompt)
+        response = await llm.invoke(formatted_prompt)
         
         logger.debug(f"Received response from Gemini (length: {len(response.content)} chars)")
         

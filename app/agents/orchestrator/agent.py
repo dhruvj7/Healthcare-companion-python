@@ -49,7 +49,7 @@ class HealthcareOrchestrator:
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
-        classification: MultiIntentClassificationResult = classify_intents(
+        classification: MultiIntentClassificationResult = await classify_intents(
             user_input=user_input,
             conversation_history=conversation_history
         )

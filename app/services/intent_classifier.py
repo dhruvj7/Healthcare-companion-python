@@ -64,7 +64,7 @@ class MultiIntentClassificationResult:
 # MAIN MULTI INTENT CLASSIFIER
 # ---------------------------------------------------------
 
-def classify_intents(
+async def classify_intents(
     user_input: str,
     conversation_history: Optional[list] = None
 ) -> MultiIntentClassificationResult:
@@ -111,7 +111,7 @@ Format:
 """
 
     try:
-        response = llm.invoke(prompt)
+        response = await llm.invoke(prompt)
         content = response.content.strip()
         content = re.sub(r'^```json\s*|\s*```$', '', content, flags=re.MULTILINE)
         data = json.loads(content)

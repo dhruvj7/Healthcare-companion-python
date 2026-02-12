@@ -53,7 +53,7 @@ async def doctor_matching_node(state: SymptomAnalysisState):
 def normalize(value: str) -> str:
     return value.lower().strip()
 
-def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
+async def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
     diagnoses = state.get("differential_diagnosis") or []
     keywords = state.get("symptom_keywords") or []
 
@@ -89,7 +89,7 @@ def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
     logger.info(f"Combined text for LLM: {combined_text}")
 
     try:
-        llm_specialty = llm_resolve_specialty(combined_text)
+        llm_specialty = await llm_resolve_specialty(combined_text)
         logger.info(f"LLM predicted specialty: {llm_specialty}")
     except Exception as e:
         logger.warning(f"LLM specialty resolution failed: {e}")
