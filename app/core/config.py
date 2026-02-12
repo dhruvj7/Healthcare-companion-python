@@ -26,6 +26,9 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:4200",
     ]
+    
+    # AI/LLM Configuration
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-2.5-flash")
 
     # =========================
     # AI / LLM Configuration

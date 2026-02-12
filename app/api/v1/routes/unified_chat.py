@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., description="User's message/prompt", min_length=1)
     session_id: Optional[str] = Field(default=None)#, description="Session ID for conversation continuity")
     context: Optional[Dict[str, Any]] = Field(default=None)#, description="Additional context (user profile, location, etc.)")
+    booking_Slot_id: Optional[int] = Field(default=None)#, description="Optional booking slot ID for appointment booking")
 
     class Config:
         json_schema_extra = {
@@ -84,7 +85,8 @@ async def unified_chat(request: ChatRequest):
         result = await orchestrator.process_request(
             user_input=request.message,
             session_id=request.session_id,
-            additional_context=request.context
+            additional_context=request.context,
+            booking_slot_id=request.booking_Slot_id
         )
 
         # ================================
@@ -94,7 +96,7 @@ async def unified_chat(request: ChatRequest):
         # If new multi-intent response
         if "intents" in result:
             intents = result.get("intents", [])
-            primary_intent = intents[0] if intents else "unknown"
+            # primary_intent = intents[0] if intents else "unknown"
 
             requires_more_info = False
             follow_up_questions = []
@@ -127,7 +129,7 @@ async def unified_chat(request: ChatRequest):
                 session_id=result["session_id"],
                 timestamp=result["timestamp"],
                 user_input=result["user_input"],
-                intent=primary_intent,
+                intent=intents,
                 confidence=result.get("confidence", 0.8),
                 reasoning=result.get("reasoning", ""),
                 requires_more_info=result.get("requires_more_info", False),

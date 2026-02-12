@@ -45,6 +45,9 @@ class HospitalGuidanceState(TypedDict):
     hospital_id: str
     journey_stage: JourneyStage
     started_at: Optional[datetime]
+    user_intent:Optional[str]
+    navigation_query:Any
+    user_message:str
     
     # ===== APPOINTMENT INFO =====
     appointment_id: str
@@ -136,3 +139,5 @@ class HospitalGuidanceState(TypedDict):
     # ===== METADATA =====
     last_updated: datetime
     context: Optional[Dict[str, Any]]  # Additional context
+
+    agent_message:str

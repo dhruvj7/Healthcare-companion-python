@@ -3,6 +3,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
+from app.agents.appointment_scheduler.node import appointment_booking_node
+from app.agents.hospital_guidance.state import JourneyStage
+from app.services.intent_classifier import classify_intents, IntentType
 from app.services.intent_classifier import (
     classify_intents,
     IntentType,
@@ -10,9 +13,11 @@ from app.services.intent_classifier import (
 )
 
 from app.agents.symptom_analysis.agent import symptom_agent
+from app.agents.hospital_guidance.agent import hospital_guidance_agent
 from app.agents.doctor_finder.agent import doctor_agent
 from app.services.llm_service import get_llm
 from app.services.insurance_verifier import verify_insurance
+from app.agents.appointment_scheduler.crud import get_available_slots, book_appointment
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,7 @@ class HealthcareOrchestrator:
     def __init__(self):
         self.llm = get_llm()
         self.conversation_sessions: Dict[str, List[Dict[str, Any]]] = {}
+        self.journey_sessions: Dict[str, Dict[str, Any]] = {}
 
     # =====================================================
     # 🔥 MAIN ENTRY (MULTI-INTENT ENABLED)
@@ -31,9 +37,24 @@ class HealthcareOrchestrator:
         self,
         user_input: str,
         session_id: Optional[str] = None,
-        additional_context: Optional[Dict[str, Any]] = None
+        additional_context: Optional[Dict[str, Any]] = None,
+        booking_slot_id:Optional[int] = None
     ) -> Dict[str, Any]:
+        """
+        Main entry point for processing user requests.
 
+        Args:
+            user_input: The user's message/prompt
+            session_id: Optional session ID for conversation continuity
+            additional_context: Optional additional context (user profile, location, etc.)
+            booking_slot_id: Optional booking slot ID for appointment booking
+
+        Returns:
+            Unified response with results from appropriate agent
+        """
+        logger.info(f"Processing request: '{user_input[:100]}...'")
+
+        # Generate or use existing session ID
         if not session_id:
             session_id = f"session_{uuid.uuid4().hex[:12]}"
 
@@ -45,12 +66,14 @@ class HealthcareOrchestrator:
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
-        classification: MultiIntentClassificationResult = classify_intents(
+        classification = await classify_intents(
             user_input=user_input,
             conversation_history=conversation_history
         )
 
+        
         logger.info(f"Detected intents: {[i.value for i in classification.intents]}")
+        logger.info(f"extracted entities: {classification.extracted_entities}")
 
         results: List[Dict[str, Any]] = []
 
@@ -67,8 +90,10 @@ class HealthcareOrchestrator:
                 result = await self._execute_intent(
                     intent=intent,
                     user_input=user_input,
-                    entities=classification.extracted_entities,
-                    session_id=session_id
+                    extracted_entities=classification.extracted_entities,
+                    session_id=session_id,
+                    booking_slot_id=booking_slot_id,
+                    prev_result = results
                 )
                 result["intent"] = intent.value
                 results.append(result)
@@ -97,45 +122,91 @@ class HealthcareOrchestrator:
     # 🔥 INTENT EXECUTOR
     # =====================================================
 
-    async def _execute_intent(
-        self,
-        intent: IntentType,
-        user_input: str,
-        entities: Dict[str, Any],
-        session_id: str
-    ) -> Dict[str, Any]:
+    # async def _execute_intent(
+    #     self,
+    #     intent: IntentType,
+    #     user_input: str,
+    #     entities: Dict[str, Any],
+    #     session_id: str,
+    #     additional_context : str
+    # ) -> Dict[str, Any]:
 
-        if intent == IntentType.SYMPTOM_ANALYSIS:
-            return await self._handle_symptom_analysis(
-                user_input, entities, session_id
-            )
+    #     if intent == IntentType.SYMPTOM_ANALYSIS:
+    #         return await self._handle_symptom_analysis(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.INSURANCE_VERIFICATION:
-            return self._handle_insurance_verification(
-                user_input, entities, session_id
-            )
+    #     elif intent == IntentType.INSURANCE_VERIFICATION:
+    #         return self._handle_insurance_verification(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.APPOINTMENT_BOOKING:
-            return self._handle_appointment_booking(
-                user_input, entities, session_id
-            )
+    #     elif intent == IntentType.APPOINTMENT_BOOKING:
+    #         return self._handle_appointment_booking(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.HOSPITAL_NAVIGATION:
-            return self._handle_hospital_navigation(
-                user_input, entities, session_id
-            )
+    #     elif intent == IntentType.HOSPITAL_NAVIGATION:
+    #         return self._handle_hospital_navigation(
+    #             user_input, entities, session_id
+    #         )
 
-        elif intent == IntentType.GENERAL_HEALTH_QUESTION:
-            return self._handle_general_question(
-                user_input, entities
-            )
+    #     elif intent == IntentType.GENERAL_HEALTH_QUESTION:
+    #         return self._handle_general_question(
+    #             user_input, entities
+    #         )
+        
+    #     elif intent == IntentType.HOSPITAL_NAVIGATION:
+    #             return await self._handle_hospital_navigation(
+    #             user_input, 
+    #             entities, 
+    #             session_id,
+    #             additional_context
+    #         )
 
-        else:
-            return self._handle_unknown_intent(user_input)
+    #     else:
+    #         return self._handle_unknown_intent(user_input)
 
     # =====================================================
     # 🔥 MERGE MULTIPLE RESULTS
     # =====================================================
+    async def _execute_intent(
+        self,
+        intent: IntentType,
+        user_input: str,
+        extracted_entities: Dict[str, Any],
+        session_id: str,
+        booking_slot_id: Optional[int],
+        prev_result: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+
+        if intent == IntentType.SYMPTOM_ANALYSIS:
+            return await self._handle_symptom_analysis(
+                user_input, extracted_entities, session_id
+            )
+
+        elif intent == IntentType.INSURANCE_VERIFICATION:
+            return self._handle_insurance_verification(
+                user_input, extracted_entities, session_id
+            )
+
+        elif intent == IntentType.APPOINTMENT_BOOKING:
+            return await self._handle_appointment_booking(
+                user_input, slot_id=booking_slot_id, entities=extracted_entities, session_id=session_id, prev_result=prev_result
+            )
+
+        elif intent == IntentType.HOSPITAL_NAVIGATION:
+            return self._handle_hospital_navigation(
+                user_input, extracted_entities, session_id
+            )
+
+        elif intent == IntentType.GENERAL_HEALTH_QUESTION:
+            return self._handle_general_question(
+                user_input, extracted_entities
+            )
+
+        else:
+            return self._handle_unknown_intent(user_input)
 
     def _merge_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -227,7 +298,7 @@ class HealthcareOrchestrator:
 
         # Also run doctor matching
         result_state = await doctor_agent.ainvoke(result_state)
-
+    
         # Format response
         response = {
             "status": "success",
@@ -251,7 +322,8 @@ class HealthcareOrchestrator:
             },
             "care_options": {
                 "suggested_specialties": result_state.get("suggested_specialties"),
-                "matched_doctors": result_state.get("matched_doctors", [])
+                "matched_doctors": result_state.get("matched_doctors", []),
+                "available_slots": result_state.get("available_appointments", {})
             },
             "next_steps": self._get_next_steps(result_state)
         }
@@ -322,70 +394,451 @@ class HealthcareOrchestrator:
                 "message": "Unable to verify insurance at this time. Please try again later.",
                 "error": str(e)
             }
+    
+    def _get_first_available_slot(self, prev_results):
+        """Get the first available slot from previous results"""
+        if not prev_results:
+            return None
 
-    def _handle_appointment_booking(self, user_input: str, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+        all_slots = []
+
+        for res in reversed(prev_results):  # recent first
+            slots_dict = res.get("care_options", {}).get("available_slots")
+            if not slots_dict:
+                continue
+
+            # Flatten dict → list
+            for doctor_slots in slots_dict.values():
+                all_slots.extend(doctor_slots)
+
+        if not all_slots:
+            return None
+
+        # Sort by date + time
+        all_slots.sort(
+            key=lambda s: (s.get("slot_date"), s.get("slot_time"))
+        )
+
+        return all_slots[0]["id"]
+
+    async def _handle_appointment_booking(self, user_input: str, slot_id: int, entities: Dict[str, Any], session_id: str, prev_result: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Handle appointment booking requests"""
         logger.info("Handling appointment booking request")
+        logger.info(f"Entities received: {entities}")
 
+        # Extract booking-related entities from nested structure
+        
+        slot_id = slot_id or entities.get("slot_id") or self._get_first_available_slot(prev_results=prev_result)
+        patient_name = entities.get("patient_name")
+        patient_email = entities.get("patient_email")
+        patient_phone = entities.get("patient_phone")
+        reason_for_visit = entities.get("reason_for_visit") or entities.get("reason") or user_input
+        appointment_type = entities.get("appointment_type", "in-person")
         specialty = entities.get("specialty")
         preferred_date = entities.get("preferred_date")
+        preferred_time = entities.get("preferred_time")
         doctor_name = entities.get("doctor_name")
-        reason = entities.get("reason", user_input)
 
-        # For now, provide guidance on booking
-        # In a full implementation, this would integrate with the appointment scheduler
+        logger.info(f"Extracted values - slot_id: {slot_id}, patient_name: {patient_name}, patient_email: {patient_email}, patient_phone: {patient_phone}")
+
+        # Check if we have all required information to proceed with booking
+        if all([slot_id, patient_name, patient_email, patient_phone]):
+            logger.info(f"All booking fields present - proceeding with appointment booking for slot {slot_id}")
+
+            # Build state for booking node
+            booking_state = {
+                "slot_id": slot_id,
+                "patient_name": patient_name,
+                "patient_email": patient_email,
+                "patient_phone": patient_phone,
+                "reason_for_visit": reason_for_visit,
+                "appointment_type": appointment_type,
+                "session_id": session_id
+            }
+
+            logger.info(f"Booking state constructed: {booking_state}")
+
+            try:
+                # Call appointment booking node
+                result_state = await appointment_booking_node(booking_state)
+
+                logger.info(f"Booking node result: {result_state}")
+
+                # Format response based on booking status
+                if result_state.get("booking_status") == "confirmed":
+                    return {
+                        "status": "success",
+                        "message": result_state.get("confirmation_message"),
+                        "booking_details": result_state.get("appointment_details"),
+                        "booking_id": result_state.get("booking_id"),
+                        "emails_sent": result_state.get("emails_sent", False)
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "message": result_state.get("confirmation_message", "Failed to book appointment"),
+                        "error": result_state.get("error"),
+                        "next_steps": [
+                            "Please verify the slot is still available",
+                            "Check that all information is correct",
+                            "Try selecting a different time slot if needed"
+                        ]
+                    }
+            except Exception as e:
+                logger.error(f"Error during appointment booking: {str(e)}", exc_info=True)
+                return {
+                    "status": "error",
+                    "message": "An error occurred while booking your appointment",
+                    "error": str(e),
+                    "next_steps": ["Please try again or contact support"]
+                }
+
+        # If missing required fields, provide guidance
+        required_fields = []
+        if not slot_id:
+            required_fields.append("slot_id")
+        if not patient_name:
+            required_fields.append("patient_name")
+        if not patient_email:
+            required_fields.append("patient_email")
+        if not patient_phone:
+            required_fields.append("patient_phone")
+
+        logger.info(f"Missing required fields: {required_fields}")
+
         return {
-            "status": "guidance",
-            "message": "I can help you book an appointment! Here's what we need:",
+            "status": "needs_more_info",
+            "message": "I can help you book an appointment! Let me gather the necessary information.",
+            "required_fields": required_fields,
             "booking_flow": {
                 "step": "information_gathering",
                 "collected": {
+                    "slot_id": slot_id,
+                    "patient_name": patient_name,
+                    "patient_email": patient_email,
+                    "patient_phone": patient_phone,
                     "specialty": specialty,
                     "preferred_date": preferred_date,
+                    "preferred_time": preferred_time,
                     "doctor_name": doctor_name,
-                    "reason": reason
+                    "reason": reason_for_visit
                 },
                 "next_questions": self._generate_booking_questions(entities)
-            },
-            "available_endpoints": {
-                "list_doctors": "/api/v1/appointment-scheduler/doctors",
-                "available_slots": "/api/v1/appointment-scheduler/slots",
-                "book_appointment": "/api/v1/appointment-scheduler/book"
             },
             "instructions": [
                 "1. Choose your preferred specialty or doctor",
                 "2. View available time slots",
-                "3. Select a slot and provide patient details",
+                "3. Provide your personal details (name, email, phone)",
                 "4. Confirm your appointment"
             ]
         }
 
-    def _handle_hospital_navigation(self, user_input: str, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
-        """Handle hospital navigation requests"""
+#     async def _handle_hospital_navigation(
+#     self, 
+#     user_input: str, 
+#     entities: Dict[str, Any], 
+#     session_id: str,
+#     additional_context: Optional[Dict[str, Any]] = None
+# ) -> Dict[str, Any]:
+#         """Handle hospital navigation requests using the hospital guidance agent"""
+#         logger.info("Handling hospital navigation request")
+
+#         # Extract navigation-specific entities
+#         location_query = entities.get("location_query", "")
+#         if not location_query:
+#             location_indicators = ["where is", "how do i get to", "find", "looking for", "navigate to", "directions to"]
+#             for indicator in location_indicators:
+#                 if indicator in user_input.lower():
+#                     location_query = user_input.lower().split(indicator, 1)[1].strip().rstrip('?')
+#                     break
+            
+#             if not location_query:
+#                 location_query = user_input
+        
+#         # Get or create journey state
+#         journey_state = self._get_journey_state(session_id)
+        
+#         # Determine specific intent
+#         user_intent = self._map_navigation_intent(user_input, entities)
+        
+#         # Get current location from context or journey state
+#         current_location = None
+#         if additional_context and additional_context.get("current_location"):
+#             current_location = additional_context.get("current_location")
+#         else:
+#             current_location = journey_state.get("current_location")
+        
+#         # Build state for hospital guidance agent
+#         state = {
+#             "session_id": session_id,
+#             "patient_id": additional_context.get("patient_id", f"patient_{session_id}") if additional_context else f"patient_{session_id}",
+#             "user_message": user_input,
+#             "user_intent": user_intent, 
+#             "navigation_query": location_query,
+#             "current_location": current_location, 
+#             "journey_stage": journey_state.get("journey_stage", JourneyStage.ARRIVAL),
+#             "conversation_history": journey_state.get("conversation_history", []),
+            
+#             # Journey context
+#             "doctor_name": additional_context.get("doctor_name", "Dr. Smith") if additional_context else "Dr. Smith",
+#             "appointment_time": additional_context.get("appointment_time", datetime.now()) if additional_context else datetime.now(),
+#             "reason_for_visit": additional_context.get("reason_for_visit", "Medical consultation") if additional_context else "Medical consultation",
+            
+#             "emergency_active": False,
+#             "notifications": [],
+#             "last_updated": datetime.now()
+#         }
+
+#         logger.info("Built state for hospital guidance agent: session=%s, intent=%s, query='%s'", 
+#                     session_id, user_intent, location_query)
+        
+#         # Run hospital guidance agent
+#         try:
+#             result_state = await hospital_guidance_agent.ainvoke(state)
+            
+#             # Update journey state
+#             self._update_journey_state(session_id, result_state)
+            
+#             # Extract the agent's message
+#             agent_message = result_state.get("agent_message", "I'm here to help you navigate the hospital.")
+            
+#             # Build response
+#             response = {
+#                 "status": "success",
+#                 "message": agent_message,
+#                 "navigation": {
+#                     "current_location": result_state.get("current_location"),
+#                     "destination": result_state.get("destination"),
+#                     "route": result_state.get("current_route"),
+#                     "nearby_amenities": result_state.get("nearby_amenities", []),
+#                     "suggested_locations": result_state.get("suggested_locations", [])
+#                 },
+#                 "journey": {
+#                     "stage": result_state.get("journey_stage"),
+#                     "queue_position": result_state.get("queue_position"),
+#                     "estimated_wait": result_state.get("estimated_wait_time"),
+#                 },
+#                 "notifications": result_state.get("notifications", [])
+#             }
+            
+#             return response
+            
+#         except Exception as e:
+#             logger.error(f"Error in hospital navigation: {e}", exc_info=True)
+#             return {
+#                 "status": "error",
+#                 "message": "I encountered an issue with navigation. Let me help you anyway - where would you like to go?",
+#                 "error": str(e),
+#                 "fallback_help": {
+#                     "common_locations": [
+#                         {"name": "Main Entrance", "building": "A", "floor": "Ground"},
+#                         {"name": "Registration", "building": "A", "floor": "Ground"},
+#                         {"name": "Emergency Room", "building": "A", "floor": "Ground"},
+#                         {"name": "Cafeteria", "building": "A", "floor": "Ground"},
+#                         {"name": "Pharmacy", "building": "A", "floor": "1"},
+#                         {"name": "Laboratory", "building": "A", "floor": "2"}
+#                     ]
+#                 }
+#             }
+
+    async def _handle_hospital_navigation(
+    self, 
+    user_input: str, 
+    entities: Dict[str, Any], 
+    session_id: str,
+    additional_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Handle hospital navigation requests using the hospital guidance agent"""
         logger.info("Handling hospital navigation request")
 
-        location_query = entities.get("location_query", user_input)
-
-        return {
-            "status": "guidance",
-            "message": f"I can help you navigate the hospital. You're looking for: {location_query}",
-            "navigation_info": {
-                "query": location_query,
-                "guidance": "To use the full navigation system, please initialize a hospital journey session.",
-                "endpoint": "/api/v1/hospital-guidance/initialize"
-            },
-            "quick_help": {
-                "common_locations": [
-                    {"name": "Main Entrance", "building": "A", "floor": "Ground"},
-                    {"name": "Emergency Room", "building": "A", "floor": "Ground"},
-                    {"name": "Cafeteria", "building": "B", "floor": "1"},
-                    {"name": "Pharmacy", "building": "A", "floor": "1"},
-                    {"name": "Restrooms", "location": "Available on every floor"}
-                ]
+        # Get or create journey state
+        journey_state = self._get_journey_state(session_id)
+        
+        # Get current location from context or journey state (with fallback to main entrance)
+        current_location = None
+        if additional_context and additional_context.get("current_location"):
+            current_location = additional_context.get("current_location")
+        elif journey_state.get("current_location"):
+            current_location = journey_state.get("current_location")
+        else:
+            # Default to main entrance if no location provided
+            current_location = {
+                "building": "A",
+                "building_name": "Main Building",
+                "floor": "1",
+                "room": "main_entrance",
+                "name": "Main Entrance",
+                "coordinates": {"x": 0, "y": 0}
             }
+        
+        # Build minimal state - let the agent decide what to do
+        state = {
+            "session_id": session_id,
+            "patient_id": additional_context.get("patient_id", f"patient_{session_id}") if additional_context else f"patient_{session_id}",
+            "user_message": user_input,
+            "current_location": current_location,
+            "journey_stage": journey_state.get("journey_stage", JourneyStage.ARRIVAL),
+            "conversation_history": journey_state.get("conversation_history", []),
+            
+            # Journey context
+            "doctor_name": additional_context.get("doctor_name", "Dr. Smith") if additional_context else "Dr. Smith",
+            "appointment_time": additional_context.get("appointment_time", datetime.now()) if additional_context else datetime.now(),
+            "reason_for_visit": additional_context.get("reason_for_visit", "Medical consultation") if additional_context else "Medical consultation",
+            
+            "emergency_active": False,
+            "notifications": [],
+            "last_updated": datetime.now()
         }
 
-    def _handle_general_question(self, user_input: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+        logger.info("Invoking hospital guidance agent with message: '%s'", user_input)
+        
+        # Run hospital guidance agent - it will handle all the routing logic
+        try:
+            result_state = await hospital_guidance_agent.ainvoke(state)
+            
+            # Update journey state
+            self._update_journey_state(session_id, result_state)
+            
+            # Extract the agent's message
+            agent_message = result_state.get("agent_message", "I'm here to help you navigate the hospital.")
+            
+            # Build response
+            response = {
+                "status": "success",
+                "message": agent_message,
+                "navigation": {
+                    "current_location": result_state.get("current_location"),
+                    "destination": result_state.get("destination"),
+                    "route": result_state.get("current_route"),
+                    "nearby_amenities": result_state.get("nearby_amenities", []),
+                    "suggested_locations": result_state.get("suggested_locations", [])
+                },
+                "journey": {
+                    "stage": result_state.get("journey_stage"),
+                    "queue_position": result_state.get("queue_position"),
+                    "estimated_wait": result_state.get("estimated_wait_time"),
+                },
+                "notifications": result_state.get("notifications", [])
+            }
+            logger.info("response of hospital guidance agent: %s", response)
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error in hospital navigation: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "message": "I encountered an issue with navigation. Let me help you anyway - where would you like to go?",
+                "error": str(e),
+                "fallback_help": {
+                    "common_locations": [
+                        {"name": "Main Entrance", "building": "A", "floor": "Ground"},
+                        {"name": "Registration", "building": "A", "floor": "Ground"},
+                        {"name": "Emergency Room", "building": "A", "floor": "Ground"},
+                        {"name": "Cafeteria", "building": "A", "floor": "Ground"},
+                        {"name": "Pharmacy", "building": "A", "floor": "1"},
+                        {"name": "Laboratory", "building": "A", "floor": "2"}
+                    ]
+                }
+            }
+    
+    def _map_navigation_intent(self, user_input: str, entities: Dict[str, Any]) -> str:
+        """Map user input to specific navigation intent"""
+        user_input_lower = user_input.lower()
+        
+        # Amenity search
+        amenity_keywords = ["restroom", "bathroom", "toilet", "cafeteria", "cafe", "coffee", "food", "eat", "pharmacy", "gift shop"]
+        if any(word in user_input_lower for word in amenity_keywords):
+            return "find_amenities"
+        
+        # Navigation/directions
+        nav_keywords = ["where is", "how do i get to", "directions to", "navigate to", "take me to", "find"]
+        if any(word in user_input_lower for word in nav_keywords):
+            return "navigate"
+        
+        # Wait time
+        if any(word in user_input_lower for word in ["wait", "queue", "how long", "position"]):
+            return "check_wait"
+        
+        # Support
+        if any(word in user_input_lower for word in ["help", "lost", "confused", "don't know"]):
+            return "support"
+        
+        return "navigate"  # Default
+
+    def _get_journey_state(self, session_id: str) -> Dict[str, Any]:
+        """Get or initialize journey state for this session"""
+        if not hasattr(self, 'journey_sessions'):
+            self.journey_sessions = {}
+        
+        if session_id not in self.journey_sessions:
+            self.journey_sessions[session_id] = {
+                "journey_stage": JourneyStage.ARRIVAL,
+                "current_location": None,
+                "conversation_history": [],
+                "created_at": datetime.now().isoformat()
+            }
+        return self.journey_sessions[session_id]
+
+    def _update_journey_state(self, session_id: str, result_state: Dict[str, Any]):
+        """Update journey state with results from agent"""
+        if not hasattr(self, 'journey_sessions'):
+            self.journey_sessions = {}
+        
+        if session_id not in self.journey_sessions:
+            self.journey_sessions[session_id] = {}
+        
+        # Update with relevant fields from result
+        self.journey_sessions[session_id].update({
+            "journey_stage": result_state.get("journey_stage"),
+            "current_location": result_state.get("current_location"),
+            "destination": result_state.get("destination"),
+            "conversation_history": result_state.get("conversation_history", []),
+            "last_updated": datetime.now().isoformat()
+        })
+
+
+    def _format_navigation_message(self, result_state: Dict[str, Any]) -> str:
+        """Format a user-friendly navigation message"""
+        route = result_state.get("current_route")
+        destination = result_state.get("destination")
+        
+        if route and destination:
+            steps_text = "\n".join([
+                f"{i+1}. {step['instruction']}" 
+                for i, step in enumerate(route.get("steps", []))
+            ])
+            
+            return f"""Here's how to get to {destination['name']}:
+
+            {steps_text}
+
+            Estimated walking time: {route.get('estimated_time', 0) // 60} minutes
+            Total distance: {route.get('distance', 0)} feet
+
+            {self._get_accessibility_note(route)}
+            """
+        # Fallback message
+        return result_state.get("agent_message", "I'm here to help you navigate the hospital.")
+
+    def _get_accessibility_note(self, route: Dict[str, Any]) -> str:
+        """Add accessibility information"""
+        if route.get("accessible"):
+            return "♿ This route is wheelchair accessible."
+        return ""
+
+    def _get_fallback_navigation_help(self, location_query: str) -> Dict[str, Any]:
+        """Provide basic help when agent fails"""
+        return {
+            "common_locations": [
+                {"name": "Main Entrance", "building": "A", "floor": "Ground"},
+                {"name": "Registration", "building": "A", "floor": "Ground"},
+                {"name": "Emergency Room", "building": "A", "floor": "Ground"},
+                {"name": "Cafeteria", "building": "A", "floor": "Ground"},
+                {"name": "Pharmacy", "building": "A", "floor": "1"}
+            ],
+            "help_text": "Please ask a staff member for detailed directions, or I can help you find another location."
+        }
+
+    async  def _handle_general_question(self, user_input: str, entities: Dict[str, Any]) -> Dict[str, Any]:
         """Handle general health questions using LLM"""
         logger.info("Handling general health question")
 
@@ -405,7 +858,8 @@ Respond in a conversational tone.
 """
 
         try:
-            response = self.llm.invoke(prompt)
+            response = await self.llm.ainvoke(prompt)
+
             answer = response.content
 
             return {
@@ -475,7 +929,8 @@ Respond in a conversational tone.
         next_steps.append("Monitor your symptoms and track any changes")
 
         if state.get("requires_doctor"):
-            next_steps.append("Schedule a doctor's appointment soon")
+            next_steps.append("Schedule a doctor's appointment soon.")
+            next_steps.append("To book an appointment, choose the preferred slot, mention your name, email, phone and appointment type.")
 
         return next_steps
 
@@ -513,7 +968,6 @@ Respond in a conversational tone.
         return questions
 
         
-
 
 
 # Global orchestrator instance

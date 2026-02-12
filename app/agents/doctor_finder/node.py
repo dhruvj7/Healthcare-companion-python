@@ -12,6 +12,8 @@ import aiosqlite
 from pathlib import Path
 import logging
 
+from app.agents.appointment_scheduler.crud import get_available_slots_by_doctor_ids
+
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -108,4 +110,28 @@ def resolve_specialties(state: SymptomAnalysisState) -> Dict[str, Any]:
     return {
         **state,
         "suggested_specialties": [final_specialty],
+    }
+
+async def get_available_appointments_node(state: SymptomAnalysisState):
+    matched_doctors = state.get("matched_doctors", [])
+    doctor_ids = [d["id"] for d in matched_doctors]
+
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row  # Enable dict-like access
+        available_slots = await get_available_slots_by_doctor_ids(db, doctor_ids)
+
+    # Group slots by doctor_id
+    grouped_slots = {}
+    for slot in available_slots:
+        doctor_id = slot["doctor_id"]
+        if doctor_id not in grouped_slots:
+            grouped_slots[doctor_id] = []
+        grouped_slots[doctor_id].append(slot)
+
+    logger.info(f"Available appointments fetched for {len(grouped_slots)} doctors")
+    logger.info(f"Doctor IDs with available slots: {list(grouped_slots.keys())}")
+
+    return {
+        **state,
+        "available_appointments": grouped_slots
     }

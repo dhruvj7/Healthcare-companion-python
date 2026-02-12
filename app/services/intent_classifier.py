@@ -2,13 +2,6 @@
 
 """
 Multi-Intent Classification Service (Production Ready)
-
-Supports:
-- Multiple intents per message
-- Execution ordering
-- Emergency override
-- Robust JSON parsing
-- Fallback classification
 """
 
 import logging
@@ -40,7 +33,7 @@ class MultiIntentClassificationResult:
         confidence: float,
         reasoning: str,
         extracted_entities: Dict[str, Any],
-        requires_sequential_execution: bool,
+        requires_sequential_execution: bool = True,
     ):
         self.intents = intents
         self.execution_order = execution_order
@@ -64,7 +57,7 @@ class MultiIntentClassificationResult:
 # MAIN MULTI INTENT CLASSIFIER
 # ---------------------------------------------------------
 
-def classify_intents(
+async def classify_intents(
     user_input: str,
     conversation_history: Optional[list] = None
 ) -> MultiIntentClassificationResult:
@@ -86,7 +79,9 @@ Determine correct execution order.
 User Input:
 "{user_input}"
 
-Available intents:
+{context_str}
+
+There are following possible intents:
 - symptom_analysis
 - insurance_verification
 - appointment_booking
@@ -94,24 +89,19 @@ Available intents:
 - general_health_question
 - emergency
 
-IMPORTANT:
-- If emergency symptoms exist → emergency MUST be first and ONLY intent.
-- If symptom_analysis + appointment_booking → symptom_analysis must run first.
-- Respond ONLY in valid JSON.
-
-Format:
+Respond ONLY with valid JSON in this format:
 {{
-  "intents": ["symptom_analysis", "appointment_booking"],
-  "execution_order": ["symptom_analysis", "appointment_booking"],
-  "confidence": 0.95,
-  "reasoning": "User wants symptom analysis followed by booking",
+  "intents": ["symptom_analysis"],
+  "execution_order": ["symptom_analysis"],
+  "confidence": 0.9,
+  "reasoning": "reason",
   "extracted_entities": {{}},
   "requires_sequential_execution": true
 }}
 """
 
     try:
-        response = llm.invoke(prompt)
+        response = await llm.ainvoke(prompt)
         content = response.content.strip()
         content = re.sub(r'^```json\s*|\s*```$', '', content, flags=re.MULTILINE)
         data = json.loads(content)
@@ -135,7 +125,7 @@ Format:
             requires_sequential_execution=data.get("requires_sequential_execution", True),
         )
 
-    except Exception as e:
+    except Exception:
         logger.error("Multi-intent classification failed", exc_info=True)
         return _fallback_classification(user_input)
 
@@ -144,6 +134,44 @@ Format:
 # FALLBACK CLASSIFIER (SAFE RULE-BASED)
 # ---------------------------------------------------------
 
+# def _fallback_classification(user_input: str) -> MultiIntentClassificationResult:
+
+#     input_lower = user_input.lower()
+
+#     emergency_keywords = [
+#         "chest pain", "can't breathe", "unconscious",
+#         "bleeding heavily", "heart attack", "stroke"
+#     ]
+
+#     if any(k in input_lower for k in emergency_keywords):
+#         return MultiIntentClassificationResult(
+#             intents=[IntentType.EMERGENCY],
+#             execution_order=[IntentType.EMERGENCY],
+#             confidence=0.9,
+#             reasoning="Emergency keywords detected",
+#             extracted_entities={"symptoms": [user_input]},
+#             requires_sequential_execution=True,
+#         )
+
+#     intents = []
+
+#     if any(k in input_lower for k in ["pain", "fever", "cough", "headache"]):
+#         intents.append(IntentType.SYMPTOM_ANALYSIS)
+
+#     if any(k in input_lower for k in ["book", "appointment", "schedule"]):
+#         intents.append(IntentType.APPOINTMENT_BOOKING)
+
+#     if not intents:
+#         intents = [IntentType.GENERAL_HEALTH_QUESTION]
+
+#     return MultiIntentClassificationResult(
+#         intents=intents,
+#         execution_order=intents,
+#         confidence=0.6,
+#         reasoning="Fallback classification",
+#         extracted_entities={},
+#         requires_sequential_execution=True,
+#     )
 def _fallback_classification(user_input: str) -> MultiIntentClassificationResult:
 
     input_lower = user_input.lower()
@@ -159,17 +187,42 @@ def _fallback_classification(user_input: str) -> MultiIntentClassificationResult
             execution_order=[IntentType.EMERGENCY],
             confidence=0.9,
             reasoning="Emergency keywords detected",
-            extracted_entities={"symptoms": [user_input]},
-            requires_sequential_execution=True,
+            extracted_entities={},
+            requires_sequential_execution=False,
         )
 
     intents = []
 
+    # -----------------------------------
+    # 🏥 Hospital Navigation Detection
+    # -----------------------------------
+    navigation_keywords = [
+        "navigate", "directions", "where is", "how do i get to",
+        "route to", "find the", "locate", "cafeteria",
+        "pharmacy", "icu", "ward", "reception", "billing",
+        "lab", "laboratory", "radiology", "emergency room"
+    ]
+
+    if any(k in input_lower for k in navigation_keywords):
+        intents.append(IntentType.HOSPITAL_NAVIGATION)
+    logger.info("the intent inside the fall back is ", intents)  
+    # -----------------------------------
+    # 🤒 Symptom Analysis
+    # -----------------------------------
     if any(k in input_lower for k in ["pain", "fever", "cough", "headache"]):
         intents.append(IntentType.SYMPTOM_ANALYSIS)
 
+    # -----------------------------------
+    # 📅 Appointment Booking
+    # -----------------------------------
     if any(k in input_lower for k in ["book", "appointment", "schedule"]):
         intents.append(IntentType.APPOINTMENT_BOOKING)
+
+    if any(k in input_lower for k in ["insurance", "policy", "coverage"]):
+        intents.append(IntentType.INSURANCE_VERIFICATION)
+
+    if any(k in input_lower for k in ["where is", "directions", "location"]):
+        intents.append(IntentType.HOSPITAL_NAVIGATION)
 
     if not intents:
         intents = [IntentType.GENERAL_HEALTH_QUESTION]
@@ -177,8 +230,8 @@ def _fallback_classification(user_input: str) -> MultiIntentClassificationResult
     return MultiIntentClassificationResult(
         intents=intents,
         execution_order=intents,
-        confidence=0.6,
-        reasoning="Fallback classification",
+        confidence=0.7,
+        reasoning="Fallback rule-based classification",
         extracted_entities={},
         requires_sequential_execution=True,
-    )
+    )  
