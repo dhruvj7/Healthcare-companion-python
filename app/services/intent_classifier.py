@@ -59,7 +59,8 @@ class MultiIntentClassificationResult:
 
 async def classify_intents(
     user_input: str,
-    conversation_history: Optional[list] = None
+    conversation_history: Optional[list] = None,
+    additional_context: Optional[Dict[str, Any]] = None
 ) -> MultiIntentClassificationResult:
     logger.info("Starting process to classify intent...")
     llm = get_llm()
@@ -81,6 +82,9 @@ User Input:
 
 {context_str}
 
+Additional Context (convert ALL relevant fields into extracted_entities: Dict[str, Any]):
+{additional_context}
+
 There are following possible intents:
 - symptom_analysis
 - insurance_verification
@@ -98,6 +102,13 @@ Respond ONLY with valid JSON in this format:
   "extracted_entities": {{}},
   "requires_sequential_execution": true
 }}
+
+Rules:
+1. extracted_entities must be output in Python typing format: Dict[str, Any]
+2. Convert all relevant fields from additional_context into extracted_entities.
+3. Only omit a field if it is clearly irrelevant to the detected intents.
+4. If no relevant entities exist, return an empty Dict[str, Any] as {{}}.
+5. The output must be valid JSON only (no markdown, no extra text).
 """
 
     try:

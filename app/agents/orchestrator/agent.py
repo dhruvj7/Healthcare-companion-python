@@ -68,13 +68,15 @@ class HealthcareOrchestrator:
 
         classification = await classify_intents(
             user_input=user_input,
-            conversation_history=conversation_history
+            conversation_history=conversation_history,
+            additional_context=additional_context
         )
 
         
         logger.info(f"Detected intents: {[i.value for i in classification.intents]}")
         logger.info(f"extracted entities: {classification.extracted_entities}")
-
+        if not classification.extracted_entities:
+            classification.extracted_entities = additional_context
         results: List[Dict[str, Any]] = []
 
         # 🚨 Emergency override
@@ -337,7 +339,7 @@ class HealthcareOrchestrator:
         provider_name = entities.get("provider_name")
         policy_number = entities.get("policy_number")
         policy_holder_name = entities.get("policy_holder_name")
-        dob = entities.get("dob")
+        dob = entities.get("date_of_birth")
 
         # Check if we have required information
         required_fields = []
