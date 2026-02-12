@@ -1,5 +1,6 @@
 from langchain_core.runnables import Runnable
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from google.api_core.exceptions import ResourceExhausted
 from app.core.config import settings
 import asyncio
@@ -10,25 +11,29 @@ logger = logging.getLogger(__name__)
 
 class FallbackGeminiLLM(Runnable):
     """
-    Gemini LLM wrapper with:
-    - Model fallback
-    - Async-safe execution
-    - LangGraph compatible
+    Multi-provider LLM router:
+    1. Gemini (primary + fallback)
+    2. Groq (free cross-provider fallback)
     """
 
     def __init__(self):
-        self.models = [
+        self.gemini_models = [
             settings.PRIMARY_LLM_MODEL,
-            *settings.FALLBACK_LLM_MODELS
+            *settings.FALLBACK_LLM_MODELS,
         ]
 
+        self.groq_models = settings.GROQ_MODELS
+
     # --------------------------------------------------
-    # 🔥 ASYNC (Primary — used by FastAPI + LangGraph)
+    # 🔥 ASYNC
     # --------------------------------------------------
     async def ainvoke(self, prompt, config=None):
         last_error = None
 
-        for model_name in self.models:
+        # =========================
+        # 1️⃣ Gemini models
+        # =========================
+        for model_name in self.gemini_models:
             try:
                 logger.info(f"Trying Gemini model: {model_name}")
 
@@ -36,40 +41,61 @@ class FallbackGeminiLLM(Runnable):
                     model=model_name,
                     temperature=settings.LLM_TEMPERATURE,
                     google_api_key=settings.GOOGLE_API_KEY,
-                    max_output_tokens=settings.LLM_MAX_TOKENS
+                    max_output_tokens=settings.LLM_MAX_TOKENS,
                 )
 
                 response = await llm.ainvoke(prompt, config=config)
 
                 if response and response.content:
-                    logger.info(f"Gemini success with model: {model_name}")
+                    logger.info(f"Gemini success: {model_name}")
                     return response
 
             except ResourceExhausted as e:
-                logger.warning(f"Quota exhausted for model [{model_name}]")
+                logger.warning(f"Gemini quota exhausted [{model_name}]")
                 last_error = e
                 continue
 
             except Exception as e:
-                logger.warning(f"Gemini model failed [{model_name}]: {e}")
+                logger.warning(f"Gemini failed [{model_name}]: {e}")
                 last_error = e
                 continue
 
-        logger.error("All Gemini models exhausted")
-        raise last_error or RuntimeError("All LLM models failed")
+        # =========================
+        # 2️⃣ Groq models (FREE)
+        # =========================
+        for model_name in self.groq_models:
+            try:
+                logger.info(f"Trying Groq model: {model_name}")
+
+                llm = ChatGroq(
+                    model=model_name,
+                    api_key=settings.GROQ_API_KEY,
+                    temperature=settings.LLM_TEMPERATURE,
+                    max_tokens=settings.LLM_MAX_TOKENS,
+                )
+
+                response = await llm.ainvoke(prompt, config=config)
+
+                if response and response.content:
+                    logger.info(f"Groq success: {model_name}")
+                    return response
+
+            except Exception as e:
+                logger.warning(f"Groq failed [{model_name}]: {e}")
+                last_error = e
+                continue
+
+        logger.error("All LLM providers exhausted")
+        raise last_error or RuntimeError("All LLMs failed")
 
     # --------------------------------------------------
-    # 🔥 SYNC (Required by Runnable interface)
+    # 🔥 SYNC
     # --------------------------------------------------
     def invoke(self, prompt, config=None):
-        """
-        Safe sync wrapper.
-        DO NOT use asyncio.run() inside event loop.
-        """
         try:
             asyncio.get_running_loop()
             raise RuntimeError(
-                "Cannot use sync invoke() inside running event loop. "
+                "Cannot use sync invoke() inside event loop. "
                 "Use await llm.ainvoke(...) instead."
             )
         except RuntimeError:

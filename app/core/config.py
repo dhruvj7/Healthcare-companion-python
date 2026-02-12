@@ -1,7 +1,7 @@
 # app/core/config.py
 
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import ClassVar, List
 import os
 from dotenv import load_dotenv
 
@@ -33,12 +33,20 @@ class Settings(BaseSettings):
     # =========================
     # AI / LLM Configuration
     # =========================
-    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "AIzaSyCzzinJY82psxUk_2-ln8svB7PsIWBJK9Eqwer")
 
     # Primary LLM
     PRIMARY_LLM_MODEL: str = os.getenv(
         "PRIMARY_LLM_MODEL", "gemini-2.5-flash"
     )
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "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")
+    GROQ_MODELS: List[str] = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+    ]
+
+   
+
 
     # Fallback LLMs (comma separated)
     FALLBACK_LLM_MODELS: list[str] = [
