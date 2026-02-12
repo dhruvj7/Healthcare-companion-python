@@ -36,7 +36,7 @@ def validate_insurance(
     - Policy active status
     """
 
-    logger.info(f"Starting insurance validation for patient {state['patient_id']}")
+    logger.info(f"Starting insurance validation for session {state['session_id']}")
     logger.info(f"Insurance data received: {insurance_data}")
 
     validation_errors: List[Dict[str, str]] = []
@@ -366,7 +366,7 @@ def validate_insurance(
 
         except Exception as e:
             logger.error(f"Error during provider verification: {e}", exc_info=True)
-            # Don't fail validation if provider verification service has issues
+            # Don't fail validation if the provider verification service has issues
             validation_errors.append({
                 "field": "provider_verification",
                 "error": f"Unable to verify with insurance provider: {str(e)}",
@@ -375,7 +375,7 @@ def validate_insurance(
 
     # ===== VALIDATION SUMMARY =====
     if is_valid:
-        logger.info(f"✅ Insurance validation PASSED for patient {state['patient_id']}")
+        logger.info(f"Insurance validation PASSED for session {state['session_id']}")
         message = "Insurance details validated successfully and verified with insurance provider"
 
         # Filter out warnings
@@ -384,7 +384,7 @@ def validate_insurance(
             logger.info(f"Validation passed with {len(warning_errors)} warnings")
     else:
         error_count = len([e for e in validation_errors if e.get("severity") != "warning"])
-        logger.error(f"❌ Insurance validation FAILED for patient {state['patient_id']} - {error_count} error(s)")
+        logger.error(f"Insurance validation FAILED for session {state['session_id']} - {error_count} error(s)")
         message = f"Insurance validation failed with {error_count} error(s)"
 
     # Create notification
@@ -428,6 +428,6 @@ def validate_insurance(
             }
 
         updated_state["insurance_details"] = insurance_details
-        logger.info(f"Insurance details saved to state for patient {state['patient_id']}")
+        logger.info(f"Insurance details saved to state for session {state['session_id']}")
 
     return updated_state

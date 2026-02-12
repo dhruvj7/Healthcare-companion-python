@@ -144,22 +144,24 @@ class CheckInRequest(BaseModel):
 
 class InsuranceValidationRequest(BaseModel):
     """Validate insurance details"""
-    provider_name: str = Field(..., description="Insurance provider name", min_length=2)
-    policy_number: str = Field(..., description="Policy/member ID number", min_length=5)
-    group_number: Optional[str] = Field(default=None, description="Group number if applicable")
-    policy_holder_name: str = Field(..., description="Name of policy holder", min_length=2)
-    policy_holder_dob: str = Field(..., description="Policy holder date of birth (YYYY-MM-DD)")
-    relationship_to_patient: str = Field(..., description="Relationship to patient (self, spouse, parent, child)")
-    effective_date: str = Field(..., description="Policy effective date (YYYY-MM-DD)")
-    expiration_date: Optional[str] = Field(default=None, description="Policy expiration date (YYYY-MM-DD)")
+    provider_name: str = Field(..., description="Insurance provider name")
+    policy_number: str = Field(..., description="Insurance policy number")
+    group_number: Optional[str] = Field(None, description="Insurance group number")
+    policy_holder_name: Optional[str] = Field(None, description="Name of the policy holder")
+    policy_holder_dob: Optional[str] = Field(None, description="Policy holder date of birth (YYYY-MM-DD)")
+    relationship_to_patient: Optional[str] = Field(None,
+                                                   description="Relationship to patient (self, spouse, child, other)")
+    effective_date: Optional[str] = Field(None, description="Policy effective date (YYYY-MM-DD)")
+    expiration_date: Optional[str] = Field(None, description="Policy expiration date (YYYY-MM-DD)")
 
-    class Config:
+
+class Config:
         json_schema_extra = {
             "example": {
                 "provider_name": "Blue Cross Blue Shield",
                 "policy_number": "ABC123456789",
                 "group_number": "GRP001",
-                "policy_holder_name": "John Doe",
+                "policy_holder_name": "saif",
                 "policy_holder_dob": "1985-05-15",
                 "relationship_to_patient": "self",
                 "effective_date": "2025-01-01",
@@ -167,14 +169,24 @@ class InsuranceValidationRequest(BaseModel):
             }
         }
 
+class ValidationError(BaseModel):
+    """Individual validation error"""
+    field: str = Field(..., description="Field that failed validation")
+    error: str = Field(..., description="Error message")
+    received_value: Optional[Any] = Field(None, description="The value that was received")
+    severity: Optional[str] = Field("error", description="Severity level: error, warning, info")
+
 class InsuranceValidationResponse(BaseModel):
-    """Response for insurance validation"""
-    session_id: str
-    is_valid: bool
-    validation_errors: List[Dict[str, str]] = []
-    insurance_verified: bool = False
-    message: str
-    timestamp: datetime
+    """Response model for insurance validation"""
+    session_id: str = Field(..., description="Session identifier")
+    is_valid: bool = Field(..., description="Whether validation passed")
+    validation_errors: List[ValidationError] = Field(default_factory=list, description="List of validation errors")
+    insurance_verified: bool = Field(..., description="Whether insurance was verified against provider records")
+    message: str = Field(..., description="Human-readable message about the validation result")
+    timestamp: datetime = Field(..., description="Timestamp of validation")
+    additional_details_needed: bool = Field(False, description="Whether additional details are needed for verification")
+    missing_fields: Optional[List[str]] = Field(None, description="List of missing fields required for verification")
+    policy_details: Optional[Dict[str, Any]] = Field(None, description="Partial policy details if policy was found but verification incomplete")
 
     class Config:
         json_schema_extra = {
@@ -183,8 +195,9 @@ class InsuranceValidationResponse(BaseModel):
                 "is_valid": True,
                 "validation_errors": [],
                 "insurance_verified": True,
-                "message": "Insurance details validated successfully",
-                "timestamp": "2026-02-05T14:30:00"
+                "message": "Insurance details validated successfully and saved to your session",
+                "timestamp": "2026-02-05T14:30:00",
+                "additional_details_needed": False
             }
         }
 
@@ -213,6 +226,34 @@ class PrescriptionRequest(BaseModel):
                 "dosage": "10mg",
                 "frequency": "once daily",
                 "instructions": "Take in the morning with food"
+            }
+        }
+
+class QuickLookupResponse(BaseModel):
+    """Response model for quick policy lookup"""
+    session_id: str = Field(..., description="Session identifier")
+    policy_found: bool = Field(..., description="Whether the policy was found")
+    policy_details: Optional[Dict[str, Any]] = Field(None, description="Policy details if found")
+    additional_details_needed: bool = Field(False, description="Whether additional details are needed")
+    missing_for_verification: Optional[List[str]] = Field(None, description="Fields needed for full verification")
+    message: str = Field(..., description="Human-readable message")
+    suggestion: Optional[str] = Field(None, description="Suggestion if policy not found")
+    next_step: Optional[str] = Field(None, description="Next step to take")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "sess_abc123",
+                "policy_found": True,
+                "policy_details": {
+                    "policy_number": "ABC123456789",
+                    "policy_holder_name": "John Doe",
+                    "status": "active"
+                },
+                "additional_details_needed": True,
+                "missing_for_verification": ["policy_holder_dob"],
+                "message": "Policy found! Please provide the following details to complete verification: policy_holder_dob",
+                "next_step": "Use /validate endpoint with complete information"
             }
         }
 

@@ -6,10 +6,11 @@ Insurance Validation Router
 Handles all insurance-related operations for the hospital guidance system.
 """
 
-from fastapi import APIRouter, HTTPException, status
-from typing import Dict
+from fastapi import APIRouter, HTTPException, status, Query
+from typing import Dict, Optional
 from datetime import datetime
 import logging
+import uuid
 
 from app.models.hospital_models import (
     InsuranceValidationRequest,
@@ -34,6 +35,33 @@ def set_active_sessions(sessions: Dict[str, HospitalGuidanceState]):
     active_sessions = sessions
 
 
+def _get_or_create_session(session_id: Optional[str] = None) -> tuple[str, HospitalGuidanceState]:
+    """
+    Get an existing session or create a new one if session_id is not provided or not found.
+
+    Returns:
+        Tuple of (session_id, state)
+    """
+    if session_id and session_id in active_sessions:
+        logger.info(f"Using existing session: {session_id}")
+        return session_id, active_sessions[session_id]
+
+    # Create a new session
+    new_session_id = session_id if session_id else f"sess_{uuid.uuid4().hex[:12]}"
+    logger.info(f"Creating new session: {new_session_id}")
+
+    new_state = HospitalGuidanceState(
+        session_id=new_session_id,
+        last_updated=datetime.now(),
+        insurance_verified=False,
+        insurance_details=None,
+        insurance_validation_errors=None
+    )
+
+    active_sessions[new_session_id] = new_state
+    return new_session_id, new_state
+
+
 def _get_session(session_id: str) -> HospitalGuidanceState:
     """Get session or raise 404"""
     if session_id not in active_sessions:
@@ -44,8 +72,12 @@ def _get_session(session_id: str) -> HospitalGuidanceState:
     return active_sessions[session_id]
 
 
-@router.post("/validate/{session_id}", response_model=InsuranceValidationResponse)
-async def validate_insurance_details(session_id: str, request: InsuranceValidationRequest):
+@router.post("/validate", response_model=InsuranceValidationResponse)
+async def validate_insurance_details(
+        request: InsuranceValidationRequest,
+        session_id: Optional[str] = Query(None,
+                                          description="Optional session ID. If not provided, a new session will be created.")
+):
     """
     Validate insurance details
 
@@ -58,13 +90,35 @@ async def validate_insurance_details(session_id: str, request: InsuranceValidati
 
     Returns detailed error messages for any validation failures.
 
+    **Session Management:**
+    - If `session_id` is provided and exists: Uses existing session
+    - If `session_id` is provided but doesn't exist: Creates new session with that ID
+    - If `session_id` is not provided: Auto-generates a new session ID
 
     **State Management:**
     - On success: Saves insurance details to session state
     - On failure: Saves validation errors to session state
 
-    **Example Request:**
+    **Example Request (without session_id):**
     ```json
+    POST /api/v1/insurance/validate
+
+    {
+      "provider_name": "Blue Cross Blue Shield",
+      "policy_number": "ABC123456789",
+      "group_number": "GRP001",
+      "policy_holder_name": "John Doe",
+      "policy_holder_dob": "1985-05-15",
+      "relationship_to_patient": "self",
+      "effective_date": "2025-01-01",
+      "expiration_date": "2026-12-31"
+    }
+    ```
+
+    **Example Request (with session_id):**
+    ```json
+    POST /api/v1/insurance/validate?session_id=sess_abc123
+
     {
       "provider_name": "Blue Cross Blue Shield",
       "policy_number": "ABC123456789",
@@ -85,7 +139,27 @@ async def validate_insurance_details(session_id: str, request: InsuranceValidati
       "validation_errors": [],
       "insurance_verified": true,
       "message": "Insurance details validated successfully and saved to your session",
-      "timestamp": "2026-02-05T14:30:00"
+      "timestamp": "2026-02-05T14:30:00",
+      "additional_details_needed": false
+    }
+    ```
+
+    **Example Partial Success Response (needs additional info):**
+    ```json
+    {
+      "session_id": "sess_abc123",
+      "is_valid": false,
+      "validation_errors": [],
+      "insurance_verified": false,
+      "message": "Policy found but additional details are required for verification",
+      "timestamp": "2026-02-05T14:30:00",
+      "additional_details_needed": true,
+      "missing_fields": ["group_number", "policy_holder_dob"],
+      "policy_details": {
+        "policy_number": "ABC123456789",
+        "policy_holder_name": "John Doe",
+        "status": "active"
+      }
     }
     ```
 
@@ -103,14 +177,16 @@ async def validate_insurance_details(session_id: str, request: InsuranceValidati
       ],
       "insurance_verified": false,
       "message": "Insurance validation failed with 1 error(s). Please review and correct the issues.",
-      "timestamp": "2026-02-05T14:30:00"
+      "timestamp": "2026-02-05T14:30:00",
+      "additional_details_needed": false
     }
     ```
     """
-    state = _get_session(session_id)
-
     try:
-        logger.info(f"Validating insurance for session {session_id}")
+        # Get or create a session
+        actual_session_id, state = _get_or_create_session(session_id)
+
+        logger.info(f"Validating insurance for session {actual_session_id}")
         logger.info(f"Request data: provider={request.provider_name}, policy={request.policy_number}")
 
         # Convert request to dict
@@ -127,12 +203,52 @@ async def validate_insurance_details(session_id: str, request: InsuranceValidati
 
         logger.debug(f"Converted insurance data: {insurance_data}")
 
+        # Check if we can lookup the policy first to see what details we have
+        policy_lookup = None
+        if request.provider_name and request.policy_number:
+            policy_lookup = get_policy_details(request.provider_name, request.policy_number)
+
+        # Identify missing required fields
+        missing_fields = []
+        required_for_verification = {
+            "policy_number": request.policy_number,
+            "policy_holder_name": request.policy_holder_name,
+            "policy_holder_dob": request.policy_holder_dob
+        }
+
+        for field, value in required_for_verification.items():
+            if not value:
+                missing_fields.append(field)
+
+        # If a policy exists, but we're missing details, inform a user
+        if policy_lookup and missing_fields:
+            logger.info(f"Policy found but missing fields: {missing_fields}")
+
+            response = InsuranceValidationResponse(
+                session_id=actual_session_id,
+                is_valid=False,
+                validation_errors=[],
+                insurance_verified=False,
+                message="Policy found but additional details are required for verification",
+                timestamp=datetime.now(),
+                additional_details_needed=True,
+                missing_fields=missing_fields,
+                policy_details={
+                    "policy_number": policy_lookup.get("policy_number"),
+                    "policy_holder_name": policy_lookup.get("policy_holder_name"),
+                    "status": policy_lookup.get("status"),
+                    "coverage_type": policy_lookup.get("coverage_type")
+                }
+            )
+
+            return response
+
         # Validate insurance
         result = validate_insurance(state, insurance_data)
 
         # Update session
-        active_sessions[session_id] = result
-        logger.info(f"Session {session_id} state updated")
+        active_sessions[actual_session_id] = result
+        logger.info(f"Session {actual_session_id} state updated")
 
         # Build response
         is_valid = result.get("insurance_verified", False)
@@ -141,20 +257,21 @@ async def validate_insurance_details(session_id: str, request: InsuranceValidati
             validation_errors = []
 
         if is_valid:
-            logger.info(f"✅ Insurance validation SUCCESSFUL for session {session_id}")
+            logger.info(f"✅ Insurance validation SUCCESSFUL for session {actual_session_id}")
             message = "Insurance details validated successfully and saved to your session"
         else:
             error_count = len([e for e in validation_errors if e.get("severity") != "warning"])
-            logger.warning(f"❌ Insurance validation FAILED for session {session_id} with {error_count} error(s)")
+            logger.warning(f"❌ Insurance validation FAILED for session {actual_session_id} with {error_count} error(s)")
             message = f"Insurance validation failed with {error_count} error(s). Please review and correct the issues."
 
         response = InsuranceValidationResponse(
-            session_id=session_id,
+            session_id=actual_session_id,
             is_valid=is_valid,
             validation_errors=validation_errors,
             insurance_verified=is_valid,
             message=message,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            additional_details_needed=False
         )
 
         logger.info(f"Returning response: is_valid={is_valid}, errors_count={len(validation_errors)}")
@@ -167,6 +284,127 @@ async def validate_insurance_details(session_id: str, request: InsuranceValidati
             detail=f"Failed to validate insurance: {str(e)}"
         )
 
+
+@router.post("/quick-lookup", response_model=Dict)
+async def quick_policy_lookup(
+        provider_name: str = Query(..., description="Insurance provider name"),
+        policy_number: str = Query(..., description="Policy number"),
+        session_id: Optional[str] = Query(None, description="Optional session ID")
+):
+    """
+    Quick policy lookup to check if a policy exists and what additional details are needed
+
+    This endpoint performs a preliminary check without full validation:
+    1. Looks up the policy in the provider's database
+    2. Returns what information is on file
+    3. Indicates what additional details are needed for full verification
+
+    **Use Case:**
+    This is useful when you want to check if a policy exists before asking
+    the user to provide all verification details.
+
+    **Query Parameters:**
+    - `provider_name`: Insurance provider name (required)
+    - `policy_number`: Policy number (required)
+    - `session_id`: Optional session ID to associate the lookup with
+
+    **Example:**
+    ```
+    POST /api/v1/insurance/quick-lookup?provider_name=Blue Cross&policy_number=ABC123456789
+    ```
+
+    **Example Response (Policy Found):**
+    ```json
+    {
+      "session_id": "sess_abc123",
+      "policy_found": true,
+      "policy_details": {
+        "policy_number": "ABC123456789",
+        "policy_holder_name": "John Doe",
+        "status": "active",
+        "coverage_type": "PPO",
+        "copay_amount": "45"
+      },
+      "additional_details_needed": true,
+      "missing_for_verification": [
+        "policy_holder_dob",
+        "relationship_to_patient"
+      ],
+      "message": "Policy found! Please provide the following details to complete verification: policy_holder_dob, relationship_to_patient",
+      "next_step": "Use /validate endpoint with complete information"
+    }
+    ```
+
+    **Example Response (Policy Not Found):**
+    ```json
+    {
+      "session_id": "sess_abc123",
+      "policy_found": false,
+      "message": "Policy ABC123456789 not found for provider Blue Cross Blue Shield",
+      "suggestion": "Please verify the policy number and provider name are correct"
+    }
+    ```
+    """
+    try:
+        # Get or create session
+        actual_session_id, state = _get_or_create_session(session_id)
+
+        logger.info(f"Quick lookup: {policy_number} from {provider_name} (session: {actual_session_id})")
+
+        # Lookup policy
+        policy_details = get_policy_details(provider_name, policy_number)
+
+        if policy_details:
+            logger.info(f"Policy found: {policy_number}")
+
+            # Determine what additional details are needed
+            missing_for_verification = []
+
+            # We always need these for full verification
+            required_fields = [
+                "policy_holder_dob",
+                "relationship_to_patient"
+            ]
+
+            # Check if group number is in the policy but user might not have provided it
+            if policy_details.get("group_number"):
+                required_fields.append("group_number")
+
+            missing_for_verification = required_fields
+
+            return {
+                "session_id": actual_session_id,
+                "policy_found": True,
+                "policy_details": {
+                    "policy_number": policy_details.get("policy_number"),
+                    "group_number": policy_details.get("group_number"),
+                    "policy_holder_name": policy_details.get("policy_holder_name"),
+                    "status": policy_details.get("status"),
+                    "coverage_type": policy_details.get("coverage_type"),
+                    "copay_amount": policy_details.get("copay_amount"),
+                    "effective_date": policy_details.get("effective_date"),
+                    "expiration_date": policy_details.get("expiration_date")
+                },
+                "additional_details_needed": len(missing_for_verification) > 0,
+                "missing_for_verification": missing_for_verification,
+                "message": f"Policy found! Please provide the following details to complete verification: {', '.join(missing_for_verification)}",
+                "next_step": "Use /validate endpoint with complete information"
+            }
+        else:
+            logger.warning(f"Policy not found: {policy_number}")
+            return {
+                "session_id": actual_session_id,
+                "policy_found": False,
+                "message": f"Policy {policy_number} not found for provider {provider_name}",
+                "suggestion": "Please verify the policy number and provider name are correct"
+            }
+
+    except Exception as e:
+        logger.error(f"Error in quick lookup: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to lookup policy: {str(e)}"
+        )
 
 @router.get("/status/{session_id}")
 async def get_insurance_status(session_id: str):
@@ -362,62 +600,4 @@ async def list_available_providers():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list providers: {str(e)}"
-        )
-
-
-@router.get("/policy/{provider_name}/{policy_number}")
-async def lookup_policy(provider_name: str, policy_number: str):
-    """
-    Lookup policy details without full validation
-
-    Retrieves policy information from the insurance provider's database
-    without requiring all verification details.
-
-    **Path Parameters:**
-    - `provider_name`: Insurance provider name
-    - `policy_number`: Policy number to lookup
-
-    **Example:**
-    ```
-    GET /api/v1/insurance/policy/Blue Cross/ABC123456789
-    ```
-
-    **Response:**
-    ```json
-    {
-      "policy_found": true,
-      "policy_details": {
-        "policy_number": "ABC123456789",
-        "group_number": "GRP001",
-        "policy_holder_name": "John Doe",
-        "status": "active",
-        "coverage_type": "PPO",
-        "copay_amount": "45"
-      }
-    }
-    ```
-    """
-    try:
-        logger.info(f"Policy lookup: {policy_number} from {provider_name}")
-
-        policy_details = get_policy_details(provider_name, policy_number)
-
-        if policy_details:
-            logger.info(f"Policy found: {policy_number}")
-            return {
-                "policy_found": True,
-                "policy_details": policy_details
-            }
-        else:
-            logger.warning(f"Policy not found: {policy_number}")
-            return {
-                "policy_found": False,
-                "message": f"Policy {policy_number} not found for provider {provider_name}"
-            }
-
-    except Exception as e:
-        logger.error(f"Error looking up policy: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to lookup policy: {str(e)}"
         )
