@@ -61,7 +61,7 @@ async def classify_intents(
     user_input: str,
     conversation_history: Optional[list] = None
 ) -> MultiIntentClassificationResult:
-
+    logger.info("Starting process to classify intent...")
     llm = get_llm()
 
     context_str = ""
