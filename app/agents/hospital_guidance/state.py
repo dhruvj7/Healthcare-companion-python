@@ -62,6 +62,7 @@ class HospitalGuidanceState(TypedDict):
     destination: Optional[Dict[str, Any]]
     navigation_active: bool
     navigation_route: Optional[List[Dict[str, Any]]]
+    current_route:Optional[Dict[str, Any]]
     
     # ===== CHECK-IN STATUS =====
     check_in_completed: bool

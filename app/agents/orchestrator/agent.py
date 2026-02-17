@@ -198,7 +198,7 @@ class HealthcareOrchestrator:
             )
 
         elif intent == IntentType.HOSPITAL_NAVIGATION:
-            return self._handle_hospital_navigation(
+            return await self._handle_hospital_navigation(
                 user_input, extracted_entities, session_id
             )
 
