@@ -61,29 +61,28 @@ class FallbackGeminiLLM(Runnable):
                 continue
 
         # =========================
-        # 2️⃣ Groq models (FREE)
+        # 2️⃣ Groq models (FALLBACK ONLY - lower quality, use only if Gemini fails)
         # =========================
-        for model_name in self.groq_models:
-            try:
-                logger.info(f"Trying Groq model: {model_name}")
-
-                llm = ChatGroq(
-                    model=model_name,
-                    api_key=settings.GROQ_API_KEY,
-                    temperature=settings.LLM_TEMPERATURE,
-                    max_tokens=settings.LLM_MAX_TOKENS,
-                )
-
-                response = await llm.ainvoke(prompt, config=config)
-
-                if response and response.content:
-                    logger.info(f"Groq success: {model_name}")
-                    return response
-
-            except Exception as e:
-                logger.warning(f"Groq failed [{model_name}]: {e}")
-                last_error = e
-                continue
+        # Only use Groq if explicitly enabled AND Gemini has failed
+        if settings.LLM_USE_GROQ_FIRST:  # This flag now means "allow Groq as fallback"
+            logger.warning("Gemini exhausted, falling back to Groq (lower quality responses)")
+            for model_name in self.groq_models:
+                try:
+                    logger.info(f"Trying Groq fallback: {model_name}")
+                    llm = ChatGroq(
+                        model=model_name,
+                        api_key=settings.GROQ_API_KEY,
+                        temperature=settings.LLM_TEMPERATURE,
+                        max_tokens=settings.LLM_MAX_TOKENS,
+                    )
+                    response = await llm.ainvoke(prompt, config=config)
+                    if response and response.content:
+                        logger.warning(f"Groq fallback used (may have lower quality): {model_name}")
+                        return response
+                except Exception as e:
+                    logger.warning(f"Groq failed [{model_name}]: {e}")
+                    last_error = e
+                    continue
 
         logger.error("All LLM providers exhausted")
         raise last_error or RuntimeError("All LLMs failed")

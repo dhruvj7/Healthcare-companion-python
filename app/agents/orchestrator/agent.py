@@ -1,5 +1,6 @@
 import logging
 import uuid
+import aiosqlite
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
@@ -17,7 +18,8 @@ from app.agents.hospital_guidance.agent import hospital_guidance_agent
 from app.agents.doctor_finder.agent import doctor_agent
 from app.services.llm_service import get_llm
 from app.services.insurance_verifier import verify_insurance
-from app.agents.appointment_scheduler.crud import get_available_slots, book_appointment
+from app.agents.appointment_scheduler.crud import get_available_slots, book_appointment, get_doctors_by_specialty, get_available_slots_by_doctor_ids
+from app.data.schemas.appointment import DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +85,8 @@ class HealthcareOrchestrator:
         if IntentType.EMERGENCY in classification.intents:
             result = self._handle_emergency(
                 user_input,
-                classification.extracted_entities
+                classification.extracted_entities,
+                additional_context
             )
             result["intent"] = IntentType.EMERGENCY.value
             results.append(result)
@@ -95,7 +98,8 @@ class HealthcareOrchestrator:
                     extracted_entities=classification.extracted_entities,
                     session_id=session_id,
                     booking_slot_id=booking_slot_id,
-                    prev_result = results
+                    prev_result = results,
+                    additional_context=additional_context
                 )
                 result["intent"] = intent.value
                 results.append(result)
@@ -179,12 +183,13 @@ class HealthcareOrchestrator:
         extracted_entities: Dict[str, Any],
         session_id: str,
         booking_slot_id: Optional[int],
-        prev_result: Optional[List[Dict[str, Any]]] = None
+        prev_result: Optional[List[Dict[str, Any]]] = None,
+        additional_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
 
         if intent == IntentType.SYMPTOM_ANALYSIS:
             return await self._handle_symptom_analysis(
-                user_input, extracted_entities, session_id
+                user_input, extracted_entities, session_id, additional_context
             )
 
         elif intent == IntentType.INSURANCE_VERIFICATION:
@@ -205,6 +210,11 @@ class HealthcareOrchestrator:
         elif intent == IntentType.GENERAL_HEALTH_QUESTION:
             return self._handle_general_question(
                 user_input, extracted_entities
+            )
+
+        elif intent == IntentType.DOCTOR_SUGGESTION:
+            return await self._handle_doctor_suggestion(
+                user_input, extracted_entities, additional_context
             )
 
         else:
@@ -240,27 +250,72 @@ class HealthcareOrchestrator:
             "sub_results": results
             }
     
-    def _handle_emergency(self, user_input: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_emergency(self, user_input: str, entities: Dict[str, Any], additional_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Handle emergency situations"""
         logger.critical(f"EMERGENCY detected: {user_input}")
+
+        # Get location from context to provide region-specific emergency numbers
+        user_location = additional_context.get("location") if additional_context else None
+        user_city = None
+        user_region = None
+        ambulance_phone = None
+        
+        if user_location:
+            if isinstance(user_location, dict):
+                user_city = user_location.get("city")
+                user_region = user_location.get("region")
+                # Try to get ambulance phone from location or use default
+                ambulance_phone = user_location.get("ambulance_phone")
+        
+        # Emergency numbers by region/country
+        emergency_numbers = {
+            "108": {"label": "Emergency Services (India)", "phone": "108", "type": "national"},
+            "911": {"label": "Emergency Services (US)", "phone": "911", "type": "national"},
+            "112": {"label": "Emergency Services (EU)", "phone": "112", "type": "national"},
+        }
+        
+        # Add facility-specific ambulance if available
+        if ambulance_phone:
+            emergency_numbers["facility_ambulance"] = {
+                "label": f"Facility Ambulance ({user_city or 'Local'})",
+                "phone": ambulance_phone,
+                "type": "facility"
+            }
+        
+        # Default to India emergency numbers if region not specified
+        if not user_region:
+            primary_emergency = emergency_numbers.get("108")
+        else:
+            # Map region to appropriate emergency number
+            if "India" in str(user_region) or user_region in ["North India", "South India", "East India", "West India"]:
+                primary_emergency = emergency_numbers.get("108")
+            elif "US" in str(user_region) or "United States" in str(user_region):
+                primary_emergency = emergency_numbers.get("911")
+            else:
+                primary_emergency = emergency_numbers.get("108")  # Default to India
 
         return {
             "status": "emergency",
             "message": "🚨 EMERGENCY DETECTED - Please call emergency services immediately!",
             "emergency_instructions": [
-                "📞 Call 911 (US) or 108 (India) or your local emergency number IMMEDIATELY",
+                f"📞 Call {primary_emergency['phone']} ({primary_emergency['label']}) IMMEDIATELY",
                 "🏥 Do not drive yourself - call an ambulance",
                 "👨‍👩‍👧 Inform a family member or friend",
                 "📍 Share your location with emergency services",
                 "⏱️ Note the time symptoms started"
             ],
+            "emergency_numbers": emergency_numbers,
             "symptoms": entities.get("symptoms", [user_input]),
             "severity": "CRITICAL",
             "requires_immediate_action": True,
-            "disclaimer": "⚠️ This is a medical emergency. Call emergency services immediately. Do not wait."
+            "disclaimer": "⚠️ This is a medical emergency. Call emergency services immediately. Do not wait.",
+            "location": {
+                "city": user_city,
+                "region": user_region
+            }
         }
 
-    async def _handle_symptom_analysis(self, user_input: str, entities: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+    async def _handle_symptom_analysis(self, user_input: str, entities: Dict[str, Any], session_id: str, additional_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Handle symptom analysis using the symptom analysis agent"""
         logger.info("Handling symptom analysis request")
 
@@ -281,6 +336,25 @@ class HealthcareOrchestrator:
                 "required_fields": ["symptoms"]
             }
 
+        # Extract location from additional_context
+        user_location = additional_context.get("location") if additional_context else None
+        user_city = None
+        user_region = None
+        user_latitude = None
+        user_longitude = None
+        search_nearby = False
+        
+        if user_location:
+            if isinstance(user_location, dict):
+                user_city = user_location.get("city")
+                user_region = user_location.get("region")
+                user_latitude = user_location.get("latitude")
+                user_longitude = user_location.get("longitude")
+                search_nearby = user_location.get("search_nearby", False)
+            elif isinstance(user_location, str):
+                # Simple string location - try to extract city
+                user_city = user_location
+
         # Build state for symptom agent
         state = {
             "symptoms": symptoms if isinstance(symptoms, list) else [symptoms],
@@ -292,7 +366,14 @@ class HealthcareOrchestrator:
             "allergies": allergies,
             "requires_doctor": False,
             "is_emergency": False,
-            "conversation_id": session_id
+            "conversation_id": session_id,
+            # Location filters for doctor matching
+            "user_city": user_city,
+            "user_region": user_region,
+            "user_latitude": user_latitude,
+            "user_longitude": user_longitude,
+            "search_nearby": search_nearby,
+            "radius_km": 50.0 if search_nearby else None
         }
 
         # Run symptom analysis agent
@@ -884,6 +965,162 @@ Respond in a conversational tone.
                 "error": str(e)
             }
 
+    async def _handle_doctor_suggestion(
+        self,
+        user_input: str,
+        entities: Dict[str, Any],
+        additional_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Handle doctor suggestion requests: e.g. 'suggest 5 cardiologists'"""
+        import re
+        logger.info("Handling doctor suggestion request")
+
+        specialty_map = {
+            "cardiologist": "Cardiology",
+            "cardiology": "Cardiology",
+            "dermatologist": "Dermatology",
+            "dermatology": "Dermatology",
+            "pediatrician": "Pediatrics",
+            "pediatrics": "Pediatrics",
+            "neurologist": "Neurology",
+            "neurology": "Neurology",
+            "orthopedic": "Orthopedics",
+            "orthopedics": "Orthopedics",
+            "psychiatrist": "Psychiatry",
+            "psychiatry": "Psychiatry",
+            "ophthalmologist": "Ophthalmology",
+            "ophthalmology": "Ophthalmology",
+            "general": "General Medicine",
+            "gp": "General Medicine",
+        }
+
+        specialty = entities.get("specialty") or entities.get("speciality")
+        if not specialty:
+            # Try to infer from user input (e.g. "suggest 5 doctors cardiologist")
+            words = user_input.lower().split()
+            for w in words:
+                if w in specialty_map:
+                    specialty = specialty_map[w]
+                    break
+            if not specialty:
+                specialty = "General Medicine"
+
+        if isinstance(specialty, str) and specialty.strip():
+            specialty = specialty.strip()
+            if specialty.lower() in specialty_map:
+                specialty = specialty_map[specialty.lower()]
+
+        limit = entities.get("limit") or entities.get("count")
+        if limit is not None:
+            try:
+                limit = int(limit)
+                limit = min(max(1, limit), 20)
+            except (TypeError, ValueError):
+                limit = 5
+        else:
+            # Try to extract number from user input (e.g. "5 doctors")
+            match = re.search(r"\b(\d+)\s*(?:doctors?|physicians?|cardiologists?|dermatologists?|etc\.?)\b", user_input.lower())
+            limit = int(match.group(1)) if match else 5
+            limit = min(max(1, limit), 20)
+
+        user_city = None
+        user_region = None
+        if additional_context and additional_context.get("location"):
+            loc = additional_context["location"]
+            if isinstance(loc, dict):
+                user_city = loc.get("city")
+                user_region = loc.get("region")
+
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                db.row_factory = aiosqlite.Row
+                doctors = await get_doctors_by_specialty(
+                    db,
+                    specialty=specialty,
+                    limit=limit,
+                    city=user_city,
+                    region=user_region,
+                )
+            doctors = [dict(d) for d in doctors]
+        except Exception as e:
+            logger.error(f"Error fetching doctors: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "message": "I couldn't fetch the doctor list right now. Please try again later.",
+                "error": str(e),
+            }
+
+        if not doctors:
+            return {
+                "status": "success",
+                "message": f"I couldn't find any doctors matching **{specialty}** in our system. Try a different specialty or ask to see all available specialists.",
+                "doctors": [],
+                "specialty": specialty,
+            }
+
+        # Fetch available slots for all doctors
+        doctor_ids = [d["id"] for d in doctors]
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                db.row_factory = aiosqlite.Row
+                all_slots = await get_available_slots_by_doctor_ids(db, doctor_ids)
+            
+            # Group slots by doctor_id
+            slots_by_doctor = {}
+            for slot in all_slots:
+                doctor_id = slot["doctor_id"]
+                if doctor_id not in slots_by_doctor:
+                    slots_by_doctor[doctor_id] = []
+                slots_by_doctor[doctor_id].append(dict(slot))
+            
+            # Attach slots to each doctor
+            for doctor in doctors:
+                doctor_id = doctor["id"]
+                doctor["available_slots"] = slots_by_doctor.get(doctor_id, [])
+        except Exception as e:
+            logger.warning(f"Error fetching slots for doctors: {e}")
+            # Continue without slots if there's an error
+            for doctor in doctors:
+                doctor["available_slots"] = []
+
+        # Build a readable message with the list and available slots
+        lines = [f"Here are **{len(doctors)}** {specialty} doctor(s) I found:\n"]
+        for i, d in enumerate(doctors, 1):
+            name = d.get("name", "N/A")
+            dept = d.get("department") or d.get("specialty", "N/A")
+            city = d.get("city") or ""
+            city_str = f" ({city})" if city else ""
+            slots = d.get("available_slots", [])
+            slot_count = len(slots)
+            
+            lines.append(f"{i}. **{name}** — {dept}{city_str}")
+            
+            if slot_count > 0:
+                # Show next 3 available slots
+                next_slots = slots[:3]
+                slot_strs = []
+                for slot in next_slots:
+                    date = slot.get("slot_date", "")
+                    time = slot.get("slot_time", "")
+                    slot_strs.append(f"{date} at {time}")
+                slots_text = ", ".join(slot_strs)
+                if slot_count > 3:
+                    slots_text += f" (+{slot_count - 3} more)"
+                lines.append(f"   📅 Available slots: {slots_text}")
+            else:
+                lines.append(f"   ⚠️ No available slots at the moment")
+        
+        message = "\n".join(lines)
+        message += "\n\nYou can book an appointment with any of these doctors by saying you'd like to book and providing your details."
+
+        return {
+            "status": "success",
+            "message": message,
+            "doctors": doctors,
+            "specialty": specialty,
+            "count": len(doctors),
+        }
+
     def _handle_unknown_intent(self, user_input: str) -> Dict[str, Any]:
         """Handle unknown or unclear intents"""
         logger.warning(f"Unknown intent for input: {user_input}")
@@ -895,6 +1132,7 @@ Respond in a conversational tone.
                 "💊 Symptom Analysis - Describe your symptoms and get recommendations",
                 "🏥 Insurance Verification - Verify your insurance coverage",
                 "📅 Appointment Booking - Schedule appointments with doctors",
+                "👨‍⚕️ Doctor Suggestion - e.g. 'Suggest 5 cardiologists' or 'Find dermatologists near me'",
                 "🧭 Hospital Navigation - Get directions within the hospital",
                 "❓ General Health Questions - Ask about medical conditions, treatments, etc."
             ],

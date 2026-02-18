@@ -20,10 +20,37 @@ async def init_db():
                 email TEXT NOT NULL,
                 specialty TEXT,
                 department TEXT,
+                city TEXT,
+                region TEXT,
+                latitude REAL,
+                longitude REAL,
+                ambulance_phone TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """
         )
+        
+        # Add location columns if they don't exist (for existing databases)
+        try:
+            await db.execute("ALTER TABLE doctors ADD COLUMN city TEXT")
+        except:
+            pass
+        try:
+            await db.execute("ALTER TABLE doctors ADD COLUMN region TEXT")
+        except:
+            pass
+        try:
+            await db.execute("ALTER TABLE doctors ADD COLUMN latitude REAL")
+        except:
+            pass
+        try:
+            await db.execute("ALTER TABLE doctors ADD COLUMN longitude REAL")
+        except:
+            pass
+        try:
+            await db.execute("ALTER TABLE doctors ADD COLUMN ambulance_phone TEXT")
+        except:
+            pass
 
         # Available slots table
         await db.execute(
@@ -93,165 +120,48 @@ async def seed_sample_data():
             print("Sample data already exists")
             return
 
-        # Insert 25 sample doctors with various specialties
-        doctors = [
-            (
-                "Dr. Sarah Smith",
-                "khushaal.sharma@veersatech.com",
-                "General Practitioner",
-                "General Medicine",
-            ),
-            (
-                "Dr. John Davis",
-                "khushaal.sharma@veersatech.com",
-                "Cardiologist",
-                "Cardiology",
-            ),
-            (
-                "Dr. Emily Chen",
-                "khushaal.sharma@veersatech.com",
-                "Pediatrician",
-                "Pediatrics",
-            ),
-            (
-                "Dr. Michael Brown",
-                "khushaal.sharma@veersatech.com",
-                "General Practitioner",
-                "General Medicine",
-            ),
-            (
-                "Dr. Jessica Wilson",
-                "khushaal.sharma@veersatech.com",
-                "Dermatologist",
-                "Dermatology",
-            ),
-            (
-                "Dr. David Martinez",
-                "khushaal.sharma@veersatech.com",
-                "Cardiologist",
-                "Cardiology",
-            ),
-            (
-                "Dr. Lisa Anderson",
-                "khushaal.sharma@veersatech.com",
-                "Pediatrician",
-                "Pediatrics",
-            ),
-            (
-                "Dr. Robert Taylor",
-                "khushaal.sharma@veersatech.com",
-                "Orthopedic Surgeon",
-                "Orthopedics",
-            ),
-            (
-                "Dr. Maria Garcia",
-                "khushaal.sharma@veersatech.com",
-                "General Practitioner",
-                "General Medicine",
-            ),
-            (
-                "Dr. James Thompson",
-                "khushaal.sharma@veersatech.com",
-                "Neurologist",
-                "Neurology",
-            ),
-            (
-                "Dr. Jennifer Lee",
-                "khushaal.sharma@veersatech.com",
-                "Dermatologist",
-                "Dermatology",
-            ),
-            (
-                "Dr. William Harris",
-                "khushaal.sharma@veersatech.com",
-                "Cardiologist",
-                "Cardiology",
-            ),
-            (
-                "Dr. Amanda Clark",
-                "khushaal.sharma@veersatech.com",
-                "Pediatrician",
-                "Pediatrics",
-            ),
-            (
-                "Dr. Christopher Lewis",
-                "khushaal.sharma@veersatech.com",
-                "Orthopedic Surgeon",
-                "Orthopedics",
-            ),
-            (
-                "Dr. Michelle Walker",
-                "khushaal.sharma@veersatech.com",
-                "Psychiatrist",
-                "Psychiatry",
-            ),
-            (
-                "Dr. Daniel Hall",
-                "khushaal.sharma@veersatech.com",
-                "General Practitioner",
-                "General Medicine",
-            ),
-            (
-                "Dr. Rebecca Allen",
-                "khushaal.sharma@veersatech.com",
-                "Ophthalmologist",
-                "Ophthalmology",
-            ),
-            (
-                "Dr. Kevin Young",
-                "khushaal.sharma@veersatech.com",
-                "Neurologist",
-                "Neurology",
-            ),
-            (
-                "Dr. Laura King",
-                "khushaal.sharma@veersatech.com",
-                "Dermatologist",
-                "Dermatology",
-            ),
-            (
-                "Dr. Brian Wright",
-                "khushaal.sharma@veersatech.com",
-                "Cardiologist",
-                "Cardiology",
-            ),
-            (
-                "Dr. Stephanie Scott",
-                "khushaal.sharma@veersatech.com",
-                "Pediatrician",
-                "Pediatrics",
-            ),
-            (
-                "Dr. Anthony Green",
-                "khushaal.sharma@veersatech.com",
-                "Orthopedic Surgeon",
-                "Orthopedics",
-            ),
-            (
-                "Dr. Nicole Adams",
-                "khushaal.sharma@veersatech.com",
-                "Psychiatrist",
-                "Psychiatry",
-            ),
-            (
-                "Dr. Matthew Baker",
-                "khushaal.sharma@veersatech.com",
-                "General Practitioner",
-                "General Medicine",
-            ),
-            (
-                "Dr. Elizabeth Nelson",
-                "khushaal.sharma@veersatech.com",
-                "Ophthalmologist",
-                "Ophthalmology",
-            ),
+        # Cities with coordinates for location-based filtering
+        cities_data = [
+            ("Delhi", "North India", 28.61, 77.20, "+91-11-108"),
+            ("Mumbai", "West India", 19.07, 72.87, "+91-22-108"),
+            ("Bangalore", "South India", 12.97, 77.59, "+91-80-108"),
+            ("Pune", "West India", 18.52, 73.85, "+91-20-108"),
+            ("Hyderabad", "South India", 17.38, 78.48, "+91-40-108"),
         ]
-        assert len(doctors[0]) == 4, "Doctor seed tuple mismatch"
+        
+        # Insert 25 sample doctors with various specialties and locations
+        doctors = [
+            ("Dr. Sarah Smith", "khushaal.sharma@veersatech.com", "General Practitioner", "General Medicine", "Delhi", "North India", 28.61, 77.20, "+91-11-108"),
+            ("Dr. John Davis", "khushaal.sharma@veersatech.com", "Cardiologist", "Cardiology", "Delhi", "North India", 28.65, 77.25, "+91-11-108"),
+            ("Dr. Emily Chen", "khushaal.sharma@veersatech.com", "Pediatrician", "Pediatrics", "Mumbai", "West India", 19.07, 72.87, "+91-22-108"),
+            ("Dr. Michael Brown", "khushaal.sharma@veersatech.com", "General Practitioner", "General Medicine", "Mumbai", "West India", 19.10, 72.90, "+91-22-108"),
+            ("Dr. Jessica Wilson", "khushaal.sharma@veersatech.com", "Dermatologist", "Dermatology", "Bangalore", "South India", 12.97, 77.59, "+91-80-108"),
+            ("Dr. David Martinez", "khushaal.sharma@veersatech.com", "Cardiologist", "Cardiology", "Bangalore", "South India", 13.00, 77.62, "+91-80-108"),
+            ("Dr. Lisa Anderson", "khushaal.sharma@veersatech.com", "Pediatrician", "Pediatrics", "Pune", "West India", 18.52, 73.85, "+91-20-108"),
+            ("Dr. Robert Taylor", "khushaal.sharma@veersatech.com", "Orthopedic Surgeon", "Orthopedics", "Pune", "West India", 18.55, 73.88, "+91-20-108"),
+            ("Dr. Maria Garcia", "khushaal.sharma@veersatech.com", "General Practitioner", "General Medicine", "Hyderabad", "South India", 17.38, 78.48, "+91-40-108"),
+            ("Dr. James Thompson", "khushaal.sharma@veersatech.com", "Neurologist", "Neurology", "Hyderabad", "South India", 17.40, 78.50, "+91-40-108"),
+            ("Dr. Jennifer Lee", "khushaal.sharma@veersatech.com", "Dermatologist", "Dermatology", "Delhi", "North India", 28.58, 77.18, "+91-11-108"),
+            ("Dr. William Harris", "khushaal.sharma@veersatech.com", "Cardiologist", "Cardiology", "Mumbai", "West India", 19.05, 72.85, "+91-22-108"),
+            ("Dr. Amanda Clark", "khushaal.sharma@veersatech.com", "Pediatrician", "Pediatrics", "Bangalore", "South India", 12.94, 77.56, "+91-80-108"),
+            ("Dr. Christopher Lewis", "khushaal.sharma@veersatech.com", "Orthopedic Surgeon", "Orthopedics", "Pune", "West India", 18.50, 73.83, "+91-20-108"),
+            ("Dr. Michelle Walker", "khushaal.sharma@veersatech.com", "Psychiatrist", "Psychiatry", "Hyderabad", "South India", 17.36, 78.46, "+91-40-108"),
+            ("Dr. Daniel Hall", "khushaal.sharma@veersatech.com", "General Practitioner", "General Medicine", "Delhi", "North India", 28.63, 77.22, "+91-11-108"),
+            ("Dr. Rebecca Allen", "khushaal.sharma@veersatech.com", "Ophthalmologist", "Ophthalmology", "Mumbai", "West India", 19.09, 72.89, "+91-22-108"),
+            ("Dr. Kevin Young", "khushaal.sharma@veersatech.com", "Neurologist", "Neurology", "Bangalore", "South India", 12.99, 77.61, "+91-80-108"),
+            ("Dr. Laura King", "khushaal.sharma@veersatech.com", "Dermatologist", "Dermatology", "Pune", "West India", 18.54, 73.87, "+91-20-108"),
+            ("Dr. Brian Wright", "khushaal.sharma@veersatech.com", "Cardiologist", "Cardiology", "Hyderabad", "South India", 17.39, 78.49, "+91-40-108"),
+            ("Dr. Stephanie Scott", "khushaal.sharma@veersatech.com", "Pediatrician", "Pediatrics", "Delhi", "North India", 28.60, 77.19, "+91-11-108"),
+            ("Dr. Anthony Green", "khushaal.sharma@veersatech.com", "Orthopedic Surgeon", "Orthopedics", "Mumbai", "West India", 19.08, 72.88, "+91-22-108"),
+            ("Dr. Nicole Adams", "khushaal.sharma@veersatech.com", "Psychiatrist", "Psychiatry", "Bangalore", "South India", 12.96, 77.58, "+91-80-108"),
+            ("Dr. Matthew Baker", "khushaal.sharma@veersatech.com", "General Practitioner", "General Medicine", "Pune", "West India", 18.53, 73.86, "+91-20-108"),
+            ("Dr. Elizabeth Nelson", "khushaal.sharma@veersatech.com", "Ophthalmologist", "Ophthalmology", "Hyderabad", "South India", 17.37, 78.47, "+91-40-108"),
+        ]
 
         await db.executemany(
             """
-            INSERT INTO doctors (name, email, specialty,department)
-            VALUES (?, ?, ?,? )
+            INSERT INTO doctors (name, email, specialty, department, city, region, latitude, longitude, ambulance_phone)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             doctors,
         )
