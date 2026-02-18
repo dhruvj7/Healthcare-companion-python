@@ -24,12 +24,29 @@ async def doctor_matching_node(state: SymptomAnalysisState):
     specialties = state.get("suggested_specialties", [])
     emergency = state.get("is_emergency", False)
     normalized_specialties = {normalize(s) for s in specialties}
-    #fetching doctors from the database
+    
+    # Get location filters from state (passed from user context)
+    user_city = state.get("user_city")
+    user_region = state.get("user_region")
+    user_latitude = state.get("user_latitude")
+    user_longitude = state.get("user_longitude")
+    search_nearby = state.get("search_nearby", False)
+    radius_km = state.get("radius_km", 50.0) if search_nearby else None
+    
+    # Fetching doctors from the database with location filtering
     async with aiosqlite.connect(DATABASE_PATH) as db:
         db.row_factory = aiosqlite.Row  # Enable dict-like access
-        doctors_list = await get_all_doctors(db)
+        doctors_list = await get_all_doctors(
+            db,
+            city=user_city,
+            region=user_region,
+            latitude=user_latitude if search_nearby else None,
+            longitude=user_longitude if search_nearby else None,
+            radius_km=radius_km
+        )
     
     logger.info(f"Total doctors fetched: {len(doctors_list)}")
+    logger.info(f"Location filters - city: {user_city}, region: {user_region}, nearby: {search_nearby}")
 
     logger.info(f"Doctor matching started")
     logger.info(f"Suggested specialties: {specialties}")
@@ -37,7 +54,7 @@ async def doctor_matching_node(state: SymptomAnalysisState):
 
     matched = [
         d for d in doctors_list
-        if normalize(d["department"]) in normalized_specialties
+        if normalize(d.get("department", "")) in normalized_specialties
         #and (not emergency or d["emergency_supported"])
     ]
 

@@ -1,5 +1,6 @@
 # agents/appointment_scheduler/router.py
 from fastapi import APIRouter, HTTPException, Depends
+from typing import Optional
 import logging
 import aiosqlite
 
@@ -30,14 +31,35 @@ router = APIRouter(
 
 
 @router.get("/doctors", response_model=list[DoctorResponse])
-async def list_doctors(db: aiosqlite.Connection = Depends(get_db)):
+async def list_doctors(
+    city: Optional[str] = None,
+    region: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    radius_km: Optional[float] = None,
+    db: aiosqlite.Connection = Depends(get_db)
+):
     """
-    Get all available doctors
+    Get all available doctors, optionally filtered by location
     
-    Returns a list of all doctors in the system with their specialties.
+    Query parameters:
+    - city: Filter by city name
+    - region: Filter by region
+    - latitude: Latitude for proximity search
+    - longitude: Longitude for proximity search
+    - radius_km: Search radius in kilometers (requires latitude/longitude)
+    
+    Returns a list of doctors matching the filters.
     """
     
-    doctors = await get_all_doctors(db)
+    doctors = await get_all_doctors(
+        db,
+        city=city,
+        region=region,
+        latitude=latitude,
+        longitude=longitude,
+        radius_km=radius_km
+    )
     return doctors
 
 

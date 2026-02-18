@@ -22,6 +22,7 @@ class IntentType(str, Enum):
     HOSPITAL_NAVIGATION = "hospital_navigation"
     GENERAL_HEALTH_QUESTION = "general_health_question"
     EMERGENCY = "emergency"
+    DOCTOR_SUGGESTION = "doctor_suggestion"
     UNKNOWN = "unknown"
 
 
@@ -92,6 +93,10 @@ There are following possible intents:
 - hospital_navigation
 - general_health_question
 - emergency
+- doctor_suggestion (user wants a list of doctors by specialty, e.g. "suggest 5 cardiologists", "find me cardiologist doctors", "list dermatologists")
+
+For doctor_suggestion, extract: specialty (e.g. cardiologist, cardiology, dermatology), and optionally limit/count (e.g. 5, 10).
+If user says "suggest any 5 doctors cardiologist" -> intents: ["doctor_suggestion"], extracted_entities: {{"specialty": "Cardiology", "limit": 5}}
 
 Respond ONLY with valid JSON in this format:
 {{
@@ -234,6 +239,20 @@ def _fallback_classification(user_input: str) -> MultiIntentClassificationResult
 
     if any(k in input_lower for k in ["where is", "directions", "location"]):
         intents.append(IntentType.HOSPITAL_NAVIGATION)
+
+    # -----------------------------------
+    # 👨‍⚕️ Doctor suggestion (suggest doctors by specialty)
+    # -----------------------------------
+    doctor_keywords = [
+        "suggest", "recommend", "find", "list", "show", "give me",
+        "doctors", "cardiologist", "dermatologist", "pediatrician",
+        "neurologist", "orthopedic", "psychiatrist", "ophthalmologist",
+        "general practitioner", "physician"
+    ]
+    if any(k in input_lower for k in doctor_keywords) and any(
+        s in input_lower for s in ["doctor", "cardiologist", "dermatologist", "pediatrician", "neurologist", "orthopedic", "psychiatrist", "ophthalmologist", "physician", "specialist"]
+    ):
+        intents.append(IntentType.DOCTOR_SUGGESTION)
 
     if not intents:
         intents = [IntentType.GENERAL_HEALTH_QUESTION]
