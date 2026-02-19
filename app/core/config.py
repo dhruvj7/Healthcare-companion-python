@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
     # Lower default to reduce Gemini quota usage (512–1024 is enough for most responses)
-    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1024"))
+    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2048"))
 
     # Allow Groq as fallback when Gemini quota is exhausted (set to "false" to disable Groq entirely)
     # Note: Groq responses may be lower quality, so Gemini is always tried first

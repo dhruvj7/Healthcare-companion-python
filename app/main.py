@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
-from app.api.v1.routes import appointment_scheduler, symptom_analysis
+from app.api.v1.routes import appointment_scheduler, auth, symptom_analysis
 from app.api.v1.routes import hospital_guidance
 from app.api.v1.routes import insurance
 from app.api.v1.routes import unified_chat
@@ -77,6 +77,11 @@ app.include_router(
     prefix="/api/v1/insurance",
     tags=["Insurance Validation"]
 )
+
+app.include_router(
+    auth.router, 
+    prefix="/api/v1", 
+    tags=["Authentication"])
 
 # ===== UNIFIED CHAT ENDPOINT (Main Entry Point) =====
 app.include_router(

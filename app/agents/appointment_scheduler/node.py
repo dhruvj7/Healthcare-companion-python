@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from app.agents.appointment_scheduler.crud import book_appointment
+from app.services.calender_service import block_calendar
 from app.services.email_service import send_confirmation_emails
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,16 @@ async def appointment_booking_node(state: Dict[str, Any]) -> Dict[str, Any]:
         else:
             logger.warning(f"⚠️ Failed to send some emails for booking {appointment_data['booking_id']}")
 
+        calendar_event_id = None
+        try:
+            calendar_event_id = await block_calendar(appointment_details)
+            if calendar_event_id:
+                logger.info(f"📅 Calendar blocked for booking {appointment_data['booking_id']}")
+            else:
+                logger.info("📅 Calendar not blocked — patient hasn't authorized Google Calendar")
+        except Exception as e:
+            logger.warning(f"⚠️ Calendar block failed: {e}")
+
         # Build appointment details for response
         slot = appointment_data['slot']
         appointment_details = {
@@ -119,7 +130,8 @@ async def appointment_booking_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "booking_id": appointment_data['booking_id'],
             "appointment_details": appointment_details,
             "confirmation_message": confirmation_message,
-            "emails_sent": emails_sent
+            "emails_sent": emails_sent,
+            "calendar_event_id": calendar_event_id
         }
 
     except ValueError as e:
