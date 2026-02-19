@@ -1,0 +1,11 @@
+policy_number,group_number,policy_holder_name,policy_holder_dob,relationship,effective_date,expiration_date,status,coverage_type,copay_amount
+ABC123456789,GRP001,saif,1985-05-15,self,2025-01-01,2026-12-31,active,PPO,45
+BCBS987654321,GRP002,Dhruv jain,1990-03-20,self,2024-06-01,2025-12-31,active,HMO,30
+BCBS111222333,GRP001,Dhruv sharma,1978-11-10,self,2025-02-01,2026-12-31,active,PPO,45
+BCBS444555666,GRP003,Priyanshu,1982-07-25,self,2024-09-15,2025-12-31,expired,EPO,35
+BCBS777888999,GRP001,Ronit,1975-01-30,self,2025-01-01,2026-12-31,active,PPO,45
+BCBS101112131,GRP002,Sarah Williams,1988-12-05,self,2024-11-01,2025-12-31,active,HMO,30
+BCBS141516171,GRP004,David Martinez,1992-04-18,self,2025-03-01,2026-12-31,active,PPO,45
+BCBS181920212,GRP001,Lisa Anderson,1980-09-22,self,2024-08-01,2025-12-31,active,PPO,45
+BCBS232425262,GRP003,James Taylor,1986-06-14,self,2025-01-15,2026-12-31,active,EPO,35
+BCBS272829303,GRP002,Emily Brown,1995-02-28,self,2024-10-01,2025-12-31,active,HMO,30

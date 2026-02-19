@@ -45,6 +45,9 @@ class HospitalGuidanceState(TypedDict):
     hospital_id: str
     journey_stage: JourneyStage
     started_at: Optional[datetime]
+    user_intent:Optional[str]
+    navigation_query:Any
+    user_message:str
     
     # ===== APPOINTMENT INFO =====
     appointment_id: str
@@ -59,12 +62,17 @@ class HospitalGuidanceState(TypedDict):
     destination: Optional[Dict[str, Any]]
     navigation_active: bool
     navigation_route: Optional[List[Dict[str, Any]]]
+    current_route:Optional[Dict[str, Any]]
     
     # ===== CHECK-IN STATUS =====
     check_in_completed: bool
     insurance_verified: bool
     forms_completed: bool
     copay_paid: bool
+
+    # ===== INSURANCE DETAILS =====
+    insurance_details: Optional[Dict[str, Any]]  # Validated insurance information
+    insurance_validation_errors: Optional[List[Dict[str, str]]]  # Validation errors if any
     
     # ===== QUEUE MANAGEMENT =====
     queue_position: Optional[int]
@@ -132,3 +140,5 @@ class HospitalGuidanceState(TypedDict):
     # ===== METADATA =====
     last_updated: datetime
     context: Optional[Dict[str, Any]]  # Additional context
+
+    agent_message:str

@@ -1,0 +1,141 @@
+<!-- src/app/components/public/chat.component.html -->
+
+<div class="chat-container">
+  <!-- Header -->
+  <div class="chat-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>🏥 Healthcare Companion</h1>
+        <p class="header-subtitle">AI-Powered Healthcare Assistant</p>
+      </div>
+
+      <div class="header-actions">
+        @if (sessionId) {
+          <span class="session-badge">
+            Session: {{ sessionId.substring(0, 8) }}...
+          </span>
+        }
+
+        <button
+          class="btn-clear"
+          (click)="clearChat()"
+          title="Clear conversation"
+        >
+          🗑️ Clear
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Messages Container -->
+  <div class="messages-container" #messagesContainer>
+    <!-- Welcome / Example Prompts -->
+    @if (messages.length === 1 && messages[0].role === 'assistant') {
+      <div class="examples-section">
+        <h3>Try asking:</h3>
+
+        <div class="examples-grid">
+          @for (example of examplePrompts; track example) {
+            <button
+              class="example-prompt"
+              (click)="useExample(example)"
+            >
+              {{ example }}
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Messages -->
+    @for (message of messages; track message.timestamp) {
+      <div
+        class="message"
+        [class.message-user]="message.role === 'user'"
+        [class.message-assistant]="message.role === 'assistant'"
+        [class.message-loading]="message.isLoading"
+      >
+        <div class="message-avatar">
+          @switch (message.role) {
+            @case ('user') { 👤 }
+            @case ('assistant') { 🤖 }
+          }
+        </div>
+
+        <div class="message-content">
+          <div class="message-header">
+            <span class="message-sender">
+              {{ message.role === 'user' ? 'You' : 'AI Assistant' }}
+            </span>
+            <span class="message-time">
+              {{ formatTimestamp(message.timestamp) }}
+            </span>
+          </div>
+
+          <!-- Intent + Confidence -->
+          @if (message.role === 'assistant' && message.intent) {
+            <div class="message-meta">
+              <span
+                class="intent-badge"
+                [class]="'intent-' + getIntentBadgeColor(message.intent)"
+              >
+                {{ getIntentDisplayName(message.intent) }}
+              </span>
+
+              @if (message.confidence) {
+                <span class="confidence-badge">
+                  {{ (message.confidence * 100).toFixed(0) }}% confidence
+                </span>
+              }
+            </div>
+          }
+
+          <!-- Message Body -->
+          <div
+            class="message-text"
+            [innerHTML]="message.content | safeHtml"
+          ></div>
+        </div>
+      </div>
+    }
+
+    <!-- Error -->
+    @if (error) {
+      <div class="error-message">
+        ⚠️ {{ error }}
+      </div>
+    }
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-container">
+    <div class="input-wrapper">
+      <textarea
+        [(ngModel)]="userInput"
+        (keypress)="onKeyPress($event)"
+        placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+        class="message-input"
+        rows="1"
+        [disabled]="isLoading"
+      ></textarea>
+
+      <button
+        class="btn-send"
+        (click)="sendMessage()"
+        [disabled]="!userInput.trim() || isLoading"
+        [class.btn-loading]="isLoading"
+      >
+        @if (!isLoading) {
+          📤 Send
+        } @else {
+          ⏳ Sending...
+        }
+      </button>
+    </div>
+
+    <div class="input-hint">
+      💡 <strong>Tip:</strong> Just type naturally!  
+      The AI understands symptoms, insurance, appointments, navigation & more.
+    </div>
+  </div>
+</div>

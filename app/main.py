@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 
 from app.api.v1.routes import appointment_scheduler, symptom_analysis
 from app.api.v1.routes import hospital_guidance
+from app.api.v1.routes import insurance
+from app.api.v1.routes import unified_chat
 from app.api.middleware.error_handler import error_handler_middleware
 from app.api.middleware.logging_middleware import logging_middleware
 from app.core.config import settings
@@ -24,7 +26,7 @@ async def lifespan(app: FastAPI):
     # Startup logic here
     await init_db()
     await seed_sample_data()
-    print("✅ Database initialized and sample data seeded successfully")
+    logger.info("Database initialized and sample data seeded successfully")
 
     yield
     # Shutdown logic here
@@ -69,6 +71,22 @@ app.include_router(
     prefix="/api/v1",
     tags=["Hospital Guidance"]
 )
+
+app.include_router(
+    insurance.router,
+    prefix="/api/v1/insurance",
+    tags=["Insurance Validation"]
+)
+
+# ===== UNIFIED CHAT ENDPOINT (Main Entry Point) =====
+app.include_router(
+    unified_chat.router,
+    prefix="/api/v1/public",
+    tags=["Unified Chat (AI Orchestrator)"]
+)
+
+# Share active sessions with insurance router
+insurance.set_active_sessions(hospital_guidance.get_active_sessions())
 
 @app.get("/")
 async def root():

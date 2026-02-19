@@ -7,6 +7,26 @@ __pycache__/
 env/
 venv/
 *.egg-info/
+.python-version
+pyproject.toml
+# 🅰️ Angular / Frontend
+####################################
+# Node dependencies
+frontend/angular/node_modules/
+
+# Angular build output
+frontend/angular/dist/
+frontend/angular/.angular/
+
+# Angular cache / temp
+frontend/angular/.cache/
+frontend/angular/.vite/
+
+# Compiled JS chunks (extra safety)
+frontend/angular/**/*.js
+frontend/angular/**/*.js.map
+#gitignore file
+.gitignore
 
 #database
 database/
@@ -15,6 +35,8 @@ database/
 # Environment
 .env
 .env.local
+
+
 
 # IDE
 .vscode/
@@ -33,3 +55,15 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Documentation and Test Files (Insurance Feature)
+INSURANCE_VALIDATION_API.md
+INSURANCE_ROUTER_UPDATE.md
+IMPLEMENTATION_SUMMARY.md
+QUICK_START.md
+README_INSURANCE.md
+CSV_VERIFICATION_GUIDE.md
+#test_insurance_validation.py
+#test_insurance_csv_verification.py
+#verify_installation.py
+#verify_router.py

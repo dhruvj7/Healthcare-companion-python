@@ -40,6 +40,11 @@ router = APIRouter()
 # In-memory session storage (in production, use Redis/database)
 active_sessions: Dict[str, HospitalGuidanceState] = {}
 
+
+def get_active_sessions() -> Dict[str, HospitalGuidanceState]:
+    """Get reference to active sessions for use by other routers"""
+    return active_sessions
+
 # ===== SESSION MANAGEMENT =====
 
 @router.post("/initialize", response_model=SessionInfo, status_code=status.HTTP_201_CREATED)
@@ -78,6 +83,10 @@ async def initialize_journey(request: InitializeJourneyRequest):
             "insurance_verified": False,
             "forms_completed": False,
             "copay_paid": False,
+
+            # Insurance details
+            "insurance_details": None,
+            "insurance_validation_errors": None,
             
             # Queue
             "queue_position": None,

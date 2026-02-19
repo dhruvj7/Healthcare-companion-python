@@ -1,7 +1,10 @@
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+
+if TYPE_CHECKING:
+    from typing import ForwardRef
 
 # ===== ENUMS =====
 
@@ -127,7 +130,7 @@ class CheckInRequest(BaseModel):
     session_id: str = Field(..., description="Active session ID")
     insurance_card_image: Optional[str] = Field(default=None, description="Base64 encoded insurance card")
     medical_history_updates: Optional[Dict[str, Any]] = Field(default=None, description="Medical history changes")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -136,6 +139,65 @@ class CheckInRequest(BaseModel):
                     "new_medications": ["Aspirin 81mg"],
                     "new_allergies": []
                 }
+            }
+        }
+
+class InsuranceValidationRequest(BaseModel):
+    """Validate insurance details"""
+    provider_name: str = Field(..., description="Insurance provider name")
+    policy_number: str = Field(..., description="Insurance policy number")
+    group_number: Optional[str] = Field(None, description="Insurance group number")
+    policy_holder_name: Optional[str] = Field(None, description="Name of the policy holder")
+    policy_holder_dob: Optional[str] = Field(None, description="Policy holder date of birth (YYYY-MM-DD)")
+    relationship_to_patient: Optional[str] = Field(None,
+                                                   description="Relationship to patient (self, spouse, child, other)")
+    effective_date: Optional[str] = Field(None, description="Policy effective date (YYYY-MM-DD)")
+    expiration_date: Optional[str] = Field(None, description="Policy expiration date (YYYY-MM-DD)")
+
+
+class Config:
+        json_schema_extra = {
+            "example": {
+                "provider_name": "Blue Cross Blue Shield",
+                "policy_number": "ABC123456789",
+                "group_number": "GRP001",
+                "policy_holder_name": "saif",
+                "policy_holder_dob": "1985-05-15",
+                "relationship_to_patient": "self",
+                "effective_date": "2025-01-01",
+                "expiration_date": "2026-12-31"
+            }
+        }
+
+class ValidationError(BaseModel):
+    """Individual validation error"""
+    field: str = Field(..., description="Field that failed validation")
+    error: str = Field(..., description="Error message")
+    received_value: Optional[Any] = Field(None, description="The value that was received")
+    severity: Optional[str] = Field("error", description="Severity level: error, warning, info")
+
+class InsuranceValidationResponse(BaseModel):
+    """Response model for insurance validation"""
+    session_id: str = Field(..., description="Session identifier")
+    is_valid: bool = Field(..., description="Whether validation passed")
+    validation_errors: List[ValidationError] = Field(default_factory=list, description="List of validation errors")
+    insurance_verified: bool = Field(..., description="Whether insurance was verified against provider records")
+    message: str = Field(..., description="Human-readable message about the validation result")
+    timestamp: datetime = Field(..., description="Timestamp of validation")
+    additional_details_needed: bool = Field(False, description="Whether additional details are needed for verification")
+    missing_fields: Optional[List[str]] = Field(None, description="List of missing fields required for verification")
+    policy_details: Optional[Dict[str, Any]] = Field(None, description="Partial policy details if policy was found but verification incomplete")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "sess_abc123",
+                "is_valid": True,
+                "validation_errors": [],
+                "insurance_verified": True,
+                "message": "Insurance details validated successfully and saved to your session",
+                "timestamp": "2026-02-05T14:30:00",
+                "additional_details_needed": False
             }
         }
 
@@ -164,6 +226,34 @@ class PrescriptionRequest(BaseModel):
                 "dosage": "10mg",
                 "frequency": "once daily",
                 "instructions": "Take in the morning with food"
+            }
+        }
+
+class QuickLookupResponse(BaseModel):
+    """Response model for quick policy lookup"""
+    session_id: str = Field(..., description="Session identifier")
+    policy_found: bool = Field(..., description="Whether the policy was found")
+    policy_details: Optional[Dict[str, Any]] = Field(None, description="Policy details if found")
+    additional_details_needed: bool = Field(False, description="Whether additional details are needed")
+    missing_for_verification: Optional[List[str]] = Field(None, description="Fields needed for full verification")
+    message: str = Field(..., description="Human-readable message")
+    suggestion: Optional[str] = Field(None, description="Suggestion if policy not found")
+    next_step: Optional[str] = Field(None, description="Next step to take")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "sess_abc123",
+                "policy_found": True,
+                "policy_details": {
+                    "policy_number": "ABC123456789",
+                    "policy_holder_name": "John Doe",
+                    "status": "active"
+                },
+                "additional_details_needed": True,
+                "missing_for_verification": ["policy_holder_dob"],
+                "message": "Policy found! Please provide the following details to complete verification: policy_holder_dob",
+                "next_step": "Use /validate endpoint with complete information"
             }
         }
 
@@ -328,7 +418,7 @@ class JourneyResponse(BaseModel):
     navigation_route: Optional[List[NavigationStep]] = None
 
     # NEW: Nearby amenities (separate from notifications)
-    nearby_amenities: Optional[List[Amenity]] = None
+    nearby_amenities: Optional[List['Amenity']] = None
     amenities_last_updated: Optional[datetime] = None
     
     # Check-in status
@@ -353,10 +443,10 @@ class JourneyResponse(BaseModel):
     completed_tasks: List[str] = []
 
     # Current visit appointment
-    current_appointment: Optional[AppointmentInfo] = None
-    
+    current_appointment: Optional['AppointmentInfo'] = None
+
     # Follow-up appointment (separate from notifications!)
-    follow_up_appointment: Optional[AppointmentInfo] = None
+    follow_up_appointment: Optional['AppointmentInfo'] = None
     
     # Communications
     notifications: List[Notification] = []
@@ -560,5 +650,88 @@ class AppointmentInfo(BaseModel):
                 "reminder_sent": False,
                 "notes": "Bring previous test results",
                 "created_at": "2026-02-05T10:30:00"
+            }
+        }
+
+
+class JourneyResponse(BaseModel):
+    """Main response for journey operations"""
+    session_id: str
+    journey_stage: JourneyStageEnum
+    patient_id: str
+    
+    # Current status
+    current_location: Optional[LocationInfo] = None
+    destination: Optional[LocationInfo] = None
+    navigation_active: bool = False
+    navigation_route: Optional[List[NavigationStep]] = None
+
+    # NEW: Nearby amenities (separate from notifications)
+    nearby_amenities: Optional[List[Amenity]] = None
+    amenities_last_updated: Optional[datetime] = None
+    
+    # Check-in status
+    check_in_completed: bool = False
+    insurance_verified: bool = False
+    forms_completed: bool = False
+    copay_paid: bool = False
+    
+    # Queue information
+    queue_status: Optional[QueueStatus] = None
+    
+    # Visit information
+    visit_started: bool = False
+    visit_ended: bool = False
+    visit_summary: Optional[str] = None
+    diagnosis: Optional[str] = None
+    prescriptions: Optional[List[Prescription]] = None
+    tests_ordered: Optional[List[TestOrder]] = None
+    
+    # Tasks
+    pending_tasks: List[Task] = []
+    completed_tasks: List[str] = []
+
+    # Current visit appointment
+    current_appointment: Optional[AppointmentInfo] = None
+    
+    # Follow-up appointment (separate from notifications!)
+    follow_up_appointment: Optional[AppointmentInfo] = None
+    
+    # Communications
+    notifications: List[Notification] = []
+    
+    # Emergency
+    emergency_active: bool = False
+    
+    # Metadata
+    last_updated: datetime
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "sess_abc123",
+                "journey_stage": "waiting",
+                "patient_id": "P123456",
+                "current_location": {
+                    "building": "A",
+                    "floor": "2",
+                    "name": "Waiting Room 2A"
+                },
+                "check_in_completed": True,
+                "queue_status": {
+                    "queue_position": 3,
+                    "estimated_wait_time": 25,
+                    "patients_ahead": 2,
+                    "last_updated": "2026-02-05T14:15:00"
+                },
+                "notifications": [
+                    {
+                        "type": "info",
+                        "title": "Wait Time Update",
+                        "message": "You're 3rd in line, estimated wait: 25 minutes",
+                        "timestamp": "2026-02-05T14:15:00"
+                    }
+                ],
+                "last_updated": "2026-02-05T14:15:00"
             }
         }
