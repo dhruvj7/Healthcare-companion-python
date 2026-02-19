@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
+
 venv/
 *.egg-info/
 .python-version
@@ -33,7 +33,7 @@ database/
 *.db
 
 # Environment
-.env
+
 .env.local
 
 
