@@ -25,6 +25,7 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "http://localhost:3000",
         "http://localhost:4200",
+        "https://care-navigator.netlify.app"
     ]
     
     # AI/LLM Configuration
