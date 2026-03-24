@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
+import httpx
+import os
+
 
 from app.agents.orchestrator import orchestrator
 
@@ -73,9 +76,72 @@ class ConversationHistoryResponse(BaseModel):
     messages: List[Dict[str, Any]]
     message_count: int
 
+class GoogleCallbackRequest(BaseModel):
+    code: str
+    code_verifier: str
+ 
+ 
+class UserResponse(BaseModel):
+    name: str
+    email: str
+    picture: str
+
+
+REDIRECT_URI = "http://localhost:4200/auth/callback"
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 # ===== ENDPOINTS =====
 
+ 
+ 
+@router.post("/auth/google", response_model=UserResponse)
+async def google_auth(body: GoogleCallbackRequest):
+    async with httpx.AsyncClient() as client:
+ 
+        # Step 1: Exchange authorization code for tokens
+        token_response = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": body.code,
+                "code_verifier": body.code_verifier,
+                "redirect_uri": REDIRECT_URI,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+            },
+        )
+ 
+        if token_response.status_code != 200:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Token exchange failed: {token_response.text}"
+            )
+ 
+        tokens = token_response.json()
+        access_token = tokens.get("access_token")
+ 
+        if not access_token:
+            raise HTTPException(status_code=400, detail="No access token received")
+ 
+        # Step 2: Fetch user info from Google
+        user_response = await client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+ 
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch user info")
+ 
+        user_data = user_response.json()
+ 
+        return UserResponse(
+            name=user_data.get("name", ""),
+            email=user_data.get("email", ""),
+            picture=user_data.get("picture", ""),
+        )
+ 
 
 @router.post("/chat", response_model=ChatResponse, status_code=status.HTTP_200_OK)
 async def unified_chat(request: ChatRequest):
