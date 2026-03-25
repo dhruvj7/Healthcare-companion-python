@@ -50,7 +50,7 @@ async def appointment_booking_node(state: Dict[str, Any]) -> Dict[str, Any]:
         appointment_type = state.get("appointment_type", "in-person")
 
         # Validate required fields
-        if not all([slot_id, patient_name, patient_email, patient_phone]):
+        if not all([slot_id, patient_name, patient_email]):
             logger.error("❌ Missing required booking fields")
             return {
                 **state,
