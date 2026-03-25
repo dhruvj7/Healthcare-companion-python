@@ -4,6 +4,7 @@ import logging
 import aiosqlite
 from pathlib import Path
 from typing import Dict, Any
+import httpx
 
 from app.agents.appointment_scheduler.crud import book_appointment
 from app.services.email_service import send_confirmation_emails
@@ -141,3 +142,37 @@ async def appointment_booking_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "error": "Internal server error during booking",
             "confirmation_message": "An unexpected error occurred. Please try again later."
         }
+    
+async def block_google_calendar(access_token: str, appointment_details: dict):
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+
+    event = {
+        "summary": f"Doctor Appointment with Dr. {appointment_details['doctor']}",
+        "location": appointment_details["location"],
+        "description": appointment_details["reason_for_visit"],
+        "start": {
+            "dateTime": f"{appointment_details['date']}T{appointment_details['time']}",
+            "timeZone": "Asia/Kolkata",
+        },
+        "end": {
+            "dateTime": calculate_end_time(
+                appointment_details['date'],
+                appointment_details['time'],
+                appointment_details['duration']
+            ),
+            "timeZone": "Asia/Kolkata",
+        },
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            },
+            json=event
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"Failed to create calendar event: {response.text}")
