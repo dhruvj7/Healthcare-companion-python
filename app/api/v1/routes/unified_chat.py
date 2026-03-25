@@ -1,6 +1,6 @@
 # app/api/v1/routes/unified_chat.py
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Header, status
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -85,6 +85,7 @@ class UserResponse(BaseModel):
     name: str
     email: str
     picture: str
+    access_token: str
 
 
 REDIRECT_URI = os.getenv("REDIRECT_URI")
@@ -134,24 +135,28 @@ async def google_auth(body: GoogleCallbackRequest):
             raise HTTPException(status_code=400, detail="Failed to fetch user info")
  
         user_data = user_response.json()
+        logger.info("access token-" + access_token + " name - " + user_data.get("name", ""))
  
-        return UserResponse(
-            name=user_data.get("name", ""),
-            email=user_data.get("email", ""),
-            picture=user_data.get("picture", ""),
-        )
+        return {
+            "name": user_data.get("name", ""),
+            "email": user_data.get("email", ""),
+            "picture": user_data.get("picture", ""),
+            "access_token": access_token
+        }
  
 
 @router.post("/chat", response_model=ChatResponse, status_code=status.HTTP_200_OK)
-async def unified_chat(request: ChatRequest):
+async def unified_chat(request: ChatRequest, authorization: str = Header(None)):
     try:
         logger.info(f"Received chat request: '{request.message[:100]}...'")
+        access_token = authorization.replace("Bearer ", "")
 
         result = await orchestrator.process_request(
             user_input=request.message,
             session_id=request.session_id,
             additional_context=request.context,
-            booking_slot_id=request.booking_Slot_id
+            booking_slot_id=request.booking_Slot_id,
+            access_token=access_token
         )
 
         # ================================

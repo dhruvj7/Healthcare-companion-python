@@ -1,5 +1,6 @@
 # app/agents/appointment_scheduler/node.py
 
+from datetime import datetime, timedelta
 import logging
 import aiosqlite
 from pathlib import Path
@@ -113,6 +114,14 @@ async def appointment_booking_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
         logger.info("✅ Appointment booking node completed successfully")
 
+        access_token = state.get("access_token")
+        
+        if access_token:
+            await block_google_calendar(access_token, appointment_details)
+        else :
+            logger.warning("⚠️ No access token provided, skipping Google Calendar integration")
+        
+
         # Return updated state
         return {
             **state,
@@ -176,3 +185,8 @@ async def block_google_calendar(access_token: str, appointment_details: dict):
 
         if response.status_code != 200:
             raise Exception(f"Failed to create calendar event: {response.text}")
+
+def calculate_end_time(date, time, duration):
+    start = datetime.fromisoformat(f"{date}T{time}")
+    end = start + timedelta(minutes=duration)
+    return end.isoformat()
