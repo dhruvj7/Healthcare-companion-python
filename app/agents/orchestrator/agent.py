@@ -525,7 +525,7 @@ class HealthcareOrchestrator:
         logger.info(f"Extracted values - slot_id: {slot_id}, patient_name: {patient_name}, patient_email: {patient_email}, patient_phone: {patient_phone}")
 
         # Check if we have all required information to proceed with booking
-        if all([slot_id, patient_name, patient_email, patient_phone]):
+        if all([slot_id, patient_name, patient_email]):
             logger.info(f"All booking fields present - proceeding with appointment booking for slot {slot_id}")
 
             # Build state for booking node
