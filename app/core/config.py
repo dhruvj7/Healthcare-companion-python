@@ -11,6 +11,7 @@ load_dotenv()
 class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
+    REDIRECT_URI : str
     # =========================
     # Application
     # =========================
