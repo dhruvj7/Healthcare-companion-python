@@ -152,21 +152,41 @@ async def appointment_booking_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "confirmation_message": "An unexpected error occurred. Please try again later."
         }
     
+def normalize_time(time: str) -> str:
+    """Ensures time is always in HH:MM:SS format."""
+    parts = time.split(":")
+    if len(parts) == 2:        # "14:00" → add seconds
+        return f"{time}:00"
+    elif len(parts) == 3:      # "14:00:00" → already correct
+        return time
+    raise ValueError(f"Invalid time format: {time}")
+
+
+def calculate_end_time(date: str, time: str, duration: int) -> str:
+    start = datetime.fromisoformat(f"{date}T{time}")
+    end = start + timedelta(minutes=duration)
+    return end.strftime("%Y-%m-%dT%H:%M:%S")
+
+
 async def block_google_calendar(access_token: str, appointment_details: dict):
     url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+
+    time = normalize_time(appointment_details['time'])  # ✅ safe regardless of input
+
+    logger.info("🔗 Integrating with Google Calendar -- " + str(appointment_details))
 
     event = {
         "summary": f"Doctor Appointment with Dr. {appointment_details['doctor']}",
         "location": appointment_details["location"],
         "description": appointment_details["reason_for_visit"],
         "start": {
-            "dateTime": f"{appointment_details['date']}T{appointment_details['time']}",
+            "dateTime": f"{appointment_details['date']}T{time}",
             "timeZone": "Asia/Kolkata",
         },
         "end": {
             "dateTime": calculate_end_time(
                 appointment_details['date'],
-                appointment_details['time'],
+                time,
                 appointment_details['duration']
             ),
             "timeZone": "Asia/Kolkata",
@@ -183,10 +203,5 @@ async def block_google_calendar(access_token: str, appointment_details: dict):
             json=event
         )
 
-        if response.status_code != 200:
+        if response.status_code not in (200, 201):
             raise Exception(f"Failed to create calendar event: {response.text}")
-
-def calculate_end_time(date, time, duration):
-    start = datetime.fromisoformat(f"{date}T{time}")
-    end = start + timedelta(minutes=duration)
-    return end.isoformat()
