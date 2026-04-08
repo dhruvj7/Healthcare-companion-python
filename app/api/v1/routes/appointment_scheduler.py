@@ -16,7 +16,8 @@ from app.agents.appointment_scheduler.crud import (
     get_available_slots,
     get_slot_details,
     book_appointment,
-    get_appointment_by_booking_id
+    get_appointment_by_booking_id,
+    get_appointments_by_patient
 )
 from app.services.email_service import send_confirmation_emails
 
@@ -199,3 +200,12 @@ async def get_appointment(booking_id: str, db: aiosqlite.Connection = Depends(ge
         raise HTTPException(status_code=404, detail="Appointment not found")
     
     return appointment
+
+@router.get("/appointments/patient/{patient_email}")
+async def get_appointments_patient(patient_email: str, db: aiosqlite.Connection = Depends(get_db)):
+    appointments = await get_appointments_by_patient(db, patient_email)
+
+    if not appointments:
+        raise HTTPException(status_code=404, detail="Appointments not found")
+    
+    return appointments

@@ -19,10 +19,12 @@ groq
 google-generativeai
 
 langchain
+langchain-core
 langchain-openai
 langchain-groq
 langchain-google-genai
 langgraph
+langgraph-sdk
 langsmith
 
 tiktoken

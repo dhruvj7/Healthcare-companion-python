@@ -254,3 +254,31 @@ async def get_available_slots_by_doctor_ids(db: aiosqlite.Connection, doctor_ids
     cursor = await db.execute(query, doctor_ids)
     rows = await cursor.fetchall()
     return [dict(row) for row in rows]
+
+
+async def get_appointments_by_patient(db: aiosqlite.Connection, patient_email: str):
+    if not patient_email:
+        return []
+    
+    query = f"""
+        SELECT
+            a.*,
+            s.slot_date,
+            s.slot_time,
+            s.duration_minutes,
+            s.location,
+            d.name as doctor_name,
+            d.email as doctor_email,
+            d.specialty as doctor_specialty
+        FROM appointments a
+        JOIN available_slots s ON a.slot_id = s.id
+        JOIN doctors d ON s.doctor_id = d.id
+        WHERE a.patient_email = ?
+    """
+
+    cursor = await db.execute(query, (patient_email,))
+    rows = await cursor.fetchall()
+    if(rows):
+        return [dict(row) for row in rows]
+    else:
+        return []

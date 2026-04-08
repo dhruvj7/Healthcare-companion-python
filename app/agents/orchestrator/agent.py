@@ -40,7 +40,8 @@ class HealthcareOrchestrator:
         user_input: str,
         session_id: Optional[str] = None,
         additional_context: Optional[Dict[str, Any]] = None,
-        booking_slot_id:Optional[int] = None
+        booking_slot_id:Optional[int] = None,
+        access_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Main entry point for processing user requests.
@@ -99,7 +100,8 @@ class HealthcareOrchestrator:
                     session_id=session_id,
                     booking_slot_id=booking_slot_id,
                     prev_result = results,
-                    additional_context=additional_context
+                    additional_context=additional_context,
+                    access_token=access_token
                 )
                 result["intent"] = intent.value
                 results.append(result)
@@ -184,7 +186,8 @@ class HealthcareOrchestrator:
         session_id: str,
         booking_slot_id: Optional[int],
         prev_result: Optional[List[Dict[str, Any]]] = None,
-        additional_context: Optional[Dict[str, Any]] = None
+        additional_context: Optional[Dict[str, Any]] = None,
+        access_token: Optional[str] = None
     ) -> Dict[str, Any]:
 
         if intent == IntentType.SYMPTOM_ANALYSIS:
@@ -199,7 +202,7 @@ class HealthcareOrchestrator:
 
         elif intent == IntentType.APPOINTMENT_BOOKING:
             return await self._handle_appointment_booking(
-                user_input, slot_id=booking_slot_id, entities=extracted_entities, session_id=session_id, prev_result=prev_result
+                user_input, slot_id=booking_slot_id, entities=extracted_entities, session_id=session_id, prev_result=prev_result, access_token=access_token
             )
 
         elif intent == IntentType.HOSPITAL_NAVIGATION:
@@ -504,7 +507,7 @@ class HealthcareOrchestrator:
 
         return all_slots[0]["id"]
 
-    async def _handle_appointment_booking(self, user_input: str, slot_id: int, entities: Dict[str, Any], session_id: str, prev_result: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    async def _handle_appointment_booking(self, user_input: str, slot_id: int, entities: Dict[str, Any], session_id: str, prev_result: Optional[List[Dict[str, Any]]] = None , access_token: Optional[str] = None) -> Dict[str, Any]:
         """Handle appointment booking requests"""
         logger.info("Handling appointment booking request")
         logger.info(f"Entities received: {entities}")
@@ -525,7 +528,7 @@ class HealthcareOrchestrator:
         logger.info(f"Extracted values - slot_id: {slot_id}, patient_name: {patient_name}, patient_email: {patient_email}, patient_phone: {patient_phone}")
 
         # Check if we have all required information to proceed with booking
-        if all([slot_id, patient_name, patient_email, patient_phone]):
+        if all([slot_id, patient_name, patient_email]):
             logger.info(f"All booking fields present - proceeding with appointment booking for slot {slot_id}")
 
             # Build state for booking node
@@ -536,7 +539,8 @@ class HealthcareOrchestrator:
                 "patient_phone": patient_phone,
                 "reason_for_visit": reason_for_visit,
                 "appointment_type": appointment_type,
-                "session_id": session_id
+                "session_id": session_id,
+                "access_token": access_token
             }
 
             logger.info(f"Booking state constructed: {booking_state}")
