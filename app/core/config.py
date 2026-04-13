@@ -28,7 +28,7 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "http://localhost:3000",
         "http://localhost:4200",
-        "http://localhost:4200/chat"
+        "http://localhost:4200/chat",
         "https://care-navigator.netlify.app"
     ]
     
